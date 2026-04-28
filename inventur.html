@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Inventur</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#d68000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Inventur">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#eef0f4;--s1:#fff;--s2:#f4f6f9;
+  --br:#dde1e8;--br2:#b8bec9;
+  --a:#d68000;--a-bg:#fff8ec;--a-bd:#f0c060;
+  --tx:#1a1d23;--tm:#6b7280;--td:#9ca3af;
+  --green:#16a34a;--gbg:#f0fdf4;--gbd:#86efac;
+  --red:#dc2626;--rbg:#fef2f2;
+  --blue:#3b5fd4;--bludk:#2d4fbf;
+  --mono:'Courier New',monospace;
+  --sh:0 1px 3px rgba(0,0,0,.07);
+  --sh2:0 4px 14px rgba(0,0,0,.1);
+}
+body{background:var(--bg);color:var(--tx);font-family:'Segoe UI',system-ui,sans-serif;font-size:15px;min-height:100vh}
+
+/* HEADER */
+.hdr{background:var(--s1);border-bottom:3px solid var(--a);padding:0 12px;height:54px;display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:100;box-shadow:var(--sh)}
+.logo{font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:.1em;color:var(--a);white-space:nowrap;flex-shrink:0}
+.hdr-sep{width:1px;height:26px;background:var(--br);flex-shrink:0}
+.btn-home{background:var(--a);color:#fff;border:none;padding:7px 13px;border-radius:7px;cursor:pointer;font-size:16px;font-weight:700;flex-shrink:0;display:flex;align-items:center;gap:5px;white-space:nowrap}
+.btn-home:hover{background:#b86c00}
+.btn-home span{font-size:13px;font-weight:700}
+.hdr-crumbs{display:flex;align-items:center;gap:4px;flex:1;min-width:0;overflow:hidden}
+.crumb-btn{background:none;border:none;color:var(--tm);font-size:12px;cursor:pointer;padding:3px 5px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;font-weight:600}
+.crumb-btn:hover{background:var(--a-bg);color:var(--a)}
+.crumb-cur{font-size:12px;color:var(--a);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px}
+.crumb-sep{color:var(--br2);font-size:12px;flex-shrink:0}
+.btn-export-hdr{background:var(--green);color:#fff;border:none;padding:7px 13px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:700;white-space:nowrap;flex-shrink:0}
+.btn-export-hdr:hover{background:#15803d}
+
+/* TABS */
+.tabs{display:flex;background:var(--s1);border-bottom:1px solid var(--br);box-shadow:var(--sh)}
+.tab{flex:1;padding:11px 4px;background:none;border:none;border-bottom:3px solid transparent;color:var(--tm);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
+.tab.on{color:var(--a);border-bottom-color:var(--a)}
+
+/* CONTEXT NAV BAR — shown when deep in hierarchy */
+.ctx-nav{display:none;background:var(--a-bg);border-bottom:1px solid var(--a-bd);padding:8px 14px;gap:8px;flex-wrap:wrap;align-items:center}
+.ctx-nav.on{display:flex}
+.ctx-nav-label{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--a);font-weight:700;margin-right:2px;flex-shrink:0}
+.ctx-btn{background:var(--s1);border:1.5px solid var(--a-bd);color:var(--a);padding:6px 13px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:700;white-space:nowrap;display:flex;align-items:center;gap:5px}
+.ctx-btn:hover{background:var(--a);color:#fff;border-color:var(--a)}
+.ctx-btn.secondary{border-color:var(--br2);color:var(--tm);background:var(--s1)}
+.ctx-btn.secondary:hover{background:var(--s2);border-color:var(--br2);color:var(--tx)}
+.ctx-sep{width:1px;height:20px;background:var(--a-bd);flex-shrink:0}
+
+/* VIEWS */
+.view{display:none;padding:14px 14px 70px}.view.on{display:block}
+.mw{max-width:680px;margin:0 auto}
+
+/* LABELS */
+.lbl{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--tm);font-weight:700;margin-bottom:8px;margin-top:18px}
+.lbl:first-child{margin-top:0}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:9px 16px;border:none;border-radius:7px;cursor:pointer;font-size:13px;font-weight:700;transition:all .15s;white-space:nowrap}
+.btn:active{transform:scale(.97)}
+.btn-p{background:var(--a);color:#fff;box-shadow:0 2px 6px rgba(214,128,0,.25)}
+.btn-p:hover{background:#b86c00}
+.btn-g{background:var(--s2);color:var(--tm);border:1px solid var(--br2)}
+.btn-g:hover{background:var(--bg)}
+.btn-d{background:var(--rbg);color:var(--red);border:1px solid #fca5a5}
+.btn-d:hover{background:#fee2e2}
+.btn-sm{padding:5px 10px;font-size:12px;border-radius:5px}
+.btn-open{background:var(--a);color:#fff;padding:8px 16px;border-radius:6px;font-size:13px;font-weight:700;border:none;cursor:pointer;flex-shrink:0}
+.btn-open:hover{background:#b86c00}
+.btn-save{background:var(--blue);color:#fff;font-size:15px;padding:13px 20px;border-radius:8px;box-shadow:0 2px 8px rgba(59,95,212,.25);flex:1;font-weight:700}
+.btn-save:hover{background:var(--bludk)}
+
+/* INPUTS */
+input[type=text],input[type=number]{background:var(--s1);border:1.5px solid var(--br);color:var(--tx);padding:10px 12px;border-radius:7px;font-size:15px;font-family:inherit;width:100%;outline:none;transition:border-color .15s;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+input:focus{border-color:var(--a)!important;box-shadow:0 0 0 3px rgba(214,128,0,.12)}
+input::placeholder{color:var(--td)}
+.add-row{display:flex;gap:8px;margin-bottom:4px}
+.scan-row{display:flex;gap:7px;flex:1}
+.scan-row input{flex:1}
+.scan-btn{background:var(--a-bg);border:1.5px solid var(--a-bd);color:var(--a);padding:0 13px;border-radius:7px;cursor:pointer;font-size:19px;flex-shrink:0;display:flex;align-items:center;height:42px}
+.scan-btn:hover{background:var(--a);color:#fff;border-color:var(--a)}
+
+/* CARDS */
+.card{background:var(--s1);border:1px solid var(--br);border-radius:10px;margin-bottom:10px;overflow:hidden;box-shadow:var(--sh)}
+.row-main{display:flex;align-items:center;padding:13px 14px;gap:10px}
+.row-name{font-size:15px;font-weight:600;flex:1;color:var(--tx)}
+.badge{font-family:var(--mono);font-size:11px;color:var(--tm);background:var(--s2);padding:4px 8px;border-radius:4px;white-space:nowrap;border:1px solid var(--br)}
+.row-act{display:flex;gap:6px;padding:7px 14px;border-top:1px solid var(--br);background:var(--s2)}
+
+/* ENTRY FORM */
+.ef{background:var(--s1);border:2px solid var(--a-bd);border-radius:10px;padding:15px;margin-bottom:14px;box-shadow:var(--sh)}
+.fg{margin-bottom:11px}
+.fg label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--tm);font-weight:700;margin-bottom:4px}
+.form-btns{display:flex;gap:8px;margin-top:6px}
+
+/* TABLES */
+.tbl{width:100%;border-collapse:collapse;font-size:14px}
+.tbl th{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--tm);padding:8px 10px;border-bottom:2px solid var(--br);font-weight:700;text-align:left;background:var(--s2)}
+.tbl td{padding:9px 10px;border-bottom:1px solid var(--br);vertical-align:middle}
+.tbl tbody tr:last-child td{border-bottom:none}
+.tbl tbody tr:hover td{background:var(--a-bg)}
+.mn{font-family:var(--mono);font-size:13px;color:var(--a);font-weight:700}
+.del{background:none;border:none;color:var(--td);cursor:pointer;padding:4px 8px;border-radius:4px;font-size:13px}
+.del:hover{color:var(--red);background:var(--rbg)}
+
+/* SUMMARY */
+.stbl{width:100%;border-collapse:collapse;font-size:12px}
+.stbl th{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--tm);padding:8px 8px;border-bottom:2px solid var(--br);font-weight:700;background:var(--s2);white-space:nowrap}
+.stbl td{padding:8px 8px;border-bottom:1px solid var(--br);vertical-align:middle}
+.stbl tbody tr:last-child td{border-bottom:none}
+.stbl tbody tr:hover td{background:var(--s2)}
+.sys-inp{background:var(--s1);border:1.5px solid var(--br);color:var(--tx);padding:4px 7px;border-radius:5px;width:82px;font-family:var(--mono);font-size:12px;text-align:right;display:block;margin-left:auto;outline:none}
+.sys-inp:focus{border-color:var(--a)!important}
+.diff{font-family:var(--mono);font-weight:700;text-align:right}
+.dp{color:var(--green)}.dn{color:var(--red)}.dz{color:var(--td)}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.stat{background:var(--s1);border:1px solid var(--br);border-radius:10px;padding:11px 6px;text-align:center;box-shadow:var(--sh)}
+.stat-v{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--a)}
+.stat-l{font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:var(--tm);margin-top:2px;font-weight:600}
+
+/* CSV BOX */
+.csvbox{background:var(--gbg);border:2px solid var(--gbd);border-radius:10px;padding:14px;margin-bottom:14px}
+.csvbox-t{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--green);font-weight:700;margin-bottom:10px}
+.btn-csv{background:var(--green);color:#fff;border:none;width:100%;padding:14px;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 2px 8px rgba(22,163,74,.25)}
+.btn-csv:hover{background:#15803d}
+
+/* EMPTY */
+.empty{text-align:center;padding:36px 20px;color:var(--td);font-size:13px}
+.empty-i{font-size:32px;margin-bottom:8px}
+
+/* SCANNER */
+.ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center}
+.ov.on{display:flex}
+.modal{background:var(--s1);border-radius:14px;padding:18px;width:min(370px,96vw);box-shadow:var(--sh2)}
+.modal-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.modal-title{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--a);font-weight:700}
+.modal-x{background:var(--s2);border:1px solid var(--br);color:var(--tm);cursor:pointer;font-size:17px;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.modal-x:hover{background:var(--rbg);color:var(--red)}
+.cam-wrap{position:relative;width:100%;aspect-ratio:1/1;background:#111;border-radius:10px;overflow:hidden}
+#qv{width:100%;height:100%;object-fit:cover;display:block}#qc{display:none}
+.cam-frame{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.cam-box{width:58%;height:58%;border:3px solid var(--a);border-radius:8px;box-shadow:0 0 0 9999px rgba(0,0,0,.5)}
+.scan-st{text-align:center;padding:10px 6px 2px;font-size:13px;color:var(--tm);min-height:32px;font-weight:600}
+.scan-st.ok{color:var(--green)}.scan-st.err{color:var(--red)}
+.scan-hint{text-align:center;font-size:11px;color:var(--td);padding-bottom:4px}
+
+/* TOAST */
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%) translateY(90px);background:#1a1d23;color:#fff;padding:9px 20px;border-radius:20px;font-size:13px;z-index:400;transition:transform .28s ease;pointer-events:none;white-space:nowrap;box-shadow:var(--sh2)}
+.toast.on{transform:translateX(-50%) translateY(0)}
+
+.tbl-wrap{overflow-x:auto}
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--br2);border-radius:3px}
+@media(max-width:500px){.stats{grid-template-columns:repeat(2,1fr)}.stbl{font-size:11px}.stbl th,.stbl td{padding:6px 5px}}
+</style>
+</head>
+<body>
+
+<!-- HEADER — always visible -->
+<div class="hdr">
+  <button class="btn-home" onclick="gotoHome()" title="Startseite">🏠 <span>Start</span></button>
+  <div class="hdr-sep"></div>
+  <div class="hdr-crumbs" id="hdr-crumbs"></div>
+  <button class="btn-export-hdr" onclick="exportCSV()">⬇ CSV</button>
+</div>
+
+<!-- TABS (only on home + summary) -->
+<div class="tabs" id="tabs">
+  <button class="tab on" id="tab-home" onclick="gotoHome()">PSA</button>
+  <button class="tab" id="tab-sum"  onclick="gotoTab('summary')">Zusammenfassung</button>
+</div>
+
+<!-- CONTEXT NAV BAR — appears when inside PSA/Gebäude/Bereich -->
+<div class="ctx-nav" id="ctx-nav"></div>
+
+<!-- ═══ VIEW: HOME — PSA ═══ -->
+<div class="view on" id="v-home">
+<div class="mw">
+  <div class="lbl">PSA hinzufügen</div>
+  <div class="add-row">
+    <div class="scan-row">
+      <input type="text" id="inp-psa" placeholder="z.B. Helm Set A, Warnweste L, Handschuhe …" maxlength="80"
+        onkeydown="if(event.key==='Enter')addPSA()">
+      <button class="scan-btn" onclick="openScan('psa')" title="QR scannen">⊡</button>
+    </div>
+    <button class="btn btn-p" onclick="addPSA()">+ Hinzufügen</button>
+  </div>
+  <div class="lbl" id="psa-lbl">PSA (0)</div>
+  <div id="psa-list"></div>
+</div>
+</div>
+
+<!-- ═══ VIEW: GEBÄUDE ═══ -->
+<div class="view" id="v-bld">
+<div class="mw">
+  <div class="lbl">Gebäude hinzufügen</div>
+  <div class="add-row">
+    <input type="text" id="inp-bld" placeholder="z.B. Gebäude A, Halle 3, Lager Nord …" maxlength="80"
+      style="flex:1" onkeydown="if(event.key==='Enter')addBld()">
+    <button class="btn btn-p" onclick="addBld()">+ Hinzufügen</button>
+  </div>
+  <div class="lbl" id="bld-lbl">Gebäude</div>
+  <div id="bld-list"></div>
+</div>
+</div>
+
+<!-- ═══ VIEW: BEREICHE ═══ -->
+<div class="view" id="v-area">
+<div class="mw">
+  <div class="lbl">Bereich hinzufügen</div>
+  <div class="add-row">
+    <input type="text" id="inp-area" placeholder="z.B. Lager, Produktion, EG Raum 12 …" maxlength="80"
+      style="flex:1" onkeydown="if(event.key==='Enter')addArea()">
+    <button class="btn btn-p" onclick="addArea()">+ Hinzufügen</button>
+  </div>
+  <div class="lbl" id="area-lbl">Bereiche</div>
+  <div id="area-list"></div>
+</div>
+</div>
+
+<!-- ═══ VIEW: EINTRÄGE ═══ -->
+<div class="view" id="v-items">
+<div class="mw">
+  <div class="ef">
+    <div class="fg">
+      <label>Materialnummer</label>
+      <div class="scan-row">
+        <input type="text" id="inp-mat" placeholder="z.B. 4200123" autocomplete="off" autocorrect="off" spellcheck="false">
+        <button class="scan-btn" onclick="openScan('mat')" title="QR scannen">⊡</button>
+      </div>
+    </div>
+    <div class="fg">
+      <label>Bezeichnung</label>
+      <div class="scan-row">
+        <input type="text" id="inp-desc" placeholder="Artikelname, Typ …">
+        <button class="scan-btn" onclick="openScan('desc')" title="QR scannen">⊡</button>
+      </div>
+    </div>
+    <div class="fg">
+      <label>Menge</label>
+      <input type="number" id="inp-qty" placeholder="0" min="0" step="any"
+        onkeydown="if(event.key==='Enter')addItem()">
+    </div>
+    <div class="form-btns">
+      <button class="btn btn-save" onclick="addItem()">✓ Zählung übernehmen</button>
+      <button class="btn btn-g btn-sm" onclick="clearForm()">✕ Leeren</button>
+    </div>
+  </div>
+
+  <div class="lbl" id="items-lbl">Einträge</div>
+  <div class="card">
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr>
+          <th>Materialnr.</th><th>Bezeichnung</th>
+          <th style="text-align:right">Menge</th><th></th>
+        </tr></thead>
+        <tbody id="items-body"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="items-empty" style="display:none">
+      <div class="empty-i">📦</div>Noch keine Einträge in diesem Bereich
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ═══ VIEW: ZUSAMMENFASSUNG ═══ -->
+<div class="view" id="v-sum">
+<div class="mw">
+  <div class="stats" id="stats"></div>
+  <div class="csvbox">
+    <div class="csvbox-t">📥 CSV Export</div>
+    <button class="btn-csv" onclick="exportCSV()">⬇ CSV-Datei herunterladen</button>
+    <div style="font-size:12px;color:#15803d;text-align:center;margin-top:8px">Alle Felder in einer Zeile · Semikolon · UTF-8 für Excel</div>
+  </div>
+  <button class="btn btn-d btn-sm" onclick="clearAll()" style="margin-bottom:14px">⚠ Alle Daten löschen</button>
+  <div class="lbl">Alle Positionen (summiert über alle Standorte)</div>
+  <div class="card">
+    <div class="tbl-wrap">
+      <table class="stbl">
+        <thead><tr>
+          <th>PSA</th><th>Materialnr.</th><th>Bezeichnung</th><th>Standorte</th>
+          <th style="text-align:right">Gezählt</th>
+          <th style="text-align:right">Systembestand</th>
+          <th style="text-align:right">Differenz</th>
+        </tr></thead>
+        <tbody id="sum-body"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="sum-empty" style="display:none">
+      <div class="empty-i">📋</div>Noch keine Daten — PSA anlegen und Einträge erfassen
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- SCANNER -->
+<div class="ov" id="ov">
+  <div class="modal">
+    <div class="modal-hdr">
+      <span class="modal-title" id="scan-title">QR-Code scannen</span>
+      <button class="modal-x" onclick="closeScan()">✕</button>
+    </div>
+    <div class="cam-wrap">
+      <video id="qv" autoplay muted playsinline></video>
+      <canvas id="qc"></canvas>
+      <div class="cam-frame"><div class="cam-box"></div></div>
+    </div>
+    <div class="scan-st" id="scan-msg">Kamera wird gestartet …</div>
+    <div class="scan-hint" id="scan-hint"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const DB='inv_v5';
+let S={psas:[],blds:[],areas:[],items:[],sysQty:{}};
+let curPsaId=null,curBldId=null,curAreaId=null,scanTarget='mat';
+let camStream=null,camRAF=null,toastTimer=null;
+
+function save(){try{localStorage.setItem(DB,JSON.stringify(S));}catch(e){toast('⚠ Speicherfehler');}}
+function load(){try{const r=localStorage.getItem(DB);if(r)S=JSON.parse(r);}catch(e){}}
+
+// ── VIEWS ──────────────────────────────────────────
+const VIEWS=['v-home','v-bld','v-area','v-items','v-sum'];
+function show(id){VIEWS.forEach(v=>document.getElementById(v).classList.toggle('on',v===id));}
+
+function setCrumbs(parts){
+  // parts: [{label, fn?}]  last one = current (no fn)
+  document.getElementById('hdr-crumbs').innerHTML=parts.map((p,i)=>{
+    const sep=i>0?'<span class="crumb-sep"> › </span>':'';
+    if(p.fn) return sep+`<button class="crumb-btn" onclick="${p.fn}">${esc(p.label)}</button>`;
+    return sep+`<span class="crumb-cur">${esc(p.label)}</span>`;
+  }).join('');
+}
+
+function showTabs(on){document.getElementById('tabs').style.display=on?'':'none';}
+
+function setCtxNav(html){
+  const el=document.getElementById('ctx-nav');
+  el.innerHTML=html;
+  el.classList.toggle('on',!!html);
+}
+
+function gotoHome(){
+  showTabs(true);
+  document.getElementById('tab-home').classList.add('on');
+  document.getElementById('tab-sum').classList.remove('on');
+  setCrumbs([{label:'PSA'}]);
+  setCtxNav('');
+  show('v-home');renderPSAs();
+}
+function gotoTab(t){
+  showTabs(true);
+  document.getElementById('tab-home').classList.toggle('on',t==='home');
+  document.getElementById('tab-sum').classList.toggle('on',t==='summary');
+  if(t==='home'){setCrumbs([{label:'PSA'}]);setCtxNav('');show('v-home');renderPSAs();}
+  if(t==='summary'){setCrumbs([{label:'PSA',fn:'gotoHome()'},{label:'Zusammenfassung'}]);setCtxNav('');show('v-sum');renderSum();}
+}
+function openPSA(id){
+  curPsaId=id;
+  const p=S.psas.find(x=>x.id===id);
+  showTabs(false);
+  setCrumbs([{label:'PSA',fn:'gotoHome()'},{label:p.name}]);
+  setCtxNav(`<span class="ctx-nav-label">Weiter zu:</span>
+    <span style="font-size:13px;color:var(--tm)">→ Gebäude auswählen</span>`);
+  show('v-bld');renderBlds();
+}
+function openBld(id){
+  curBldId=id;
+  const p=S.psas.find(x=>x.id===curPsaId);
+  const b=S.blds.find(x=>x.id===id);
+  showTabs(false);
+  setCrumbs([{label:'PSA',fn:'gotoHome()'},{label:p.name,fn:`openPSA('${curPsaId}')`},{label:b.name}]);
+  setCtxNav(`<span class="ctx-nav-label">Wechseln zu:</span>
+    <button class="ctx-btn secondary" onclick="openPSA('${curPsaId}')">← Gebäude wechseln</button>
+    <span class="ctx-sep"></span>
+    <span style="font-size:13px;color:var(--tm)">→ Bereich auswählen</span>`);
+  show('v-area');renderAreas();
+}
+function openArea(id){
+  curAreaId=id;
+  const p=S.psas.find(x=>x.id===curPsaId);
+  const b=S.blds.find(x=>x.id===curBldId);
+  const a=S.areas.find(x=>x.id===id);
+  showTabs(false);
+  setCrumbs([
+    {label:'PSA',fn:'gotoHome()'},
+    {label:p.name,fn:`openPSA('${curPsaId}')`},
+    {label:b.name,fn:`openBld('${curBldId}')`},
+    {label:a.name}
+  ]);
+  setCtxNav(`<span class="ctx-nav-label">Wechseln zu:</span>
+    <button class="ctx-btn secondary" onclick="openPSA('${curPsaId}')">🏢 Gebäude wechseln</button>
+    <button class="ctx-btn" onclick="openBld('${curBldId}')">📂 Bereich wechseln</button>`);
+  show('v-items');clearForm();renderItems();
+  document.getElementById('inp-mat').focus();
+}
+
+// ── PSA ────────────────────────────────────────────
+function addPSA(){
+  const inp=document.getElementById('inp-psa');
+  const n=inp.value.trim();if(!n){inp.focus();return;}
+  S.psas.push({id:uid(),name:n});save();inp.value='';renderPSAs();toast('✓ PSA angelegt');
+}
+function delPSA(id){
+  const p=S.psas.find(x=>x.id===id);
+  const bids=S.blds.filter(b=>b.psaId===id).map(b=>b.id);
+  const aids=S.areas.filter(a=>bids.includes(a.bldId)).map(a=>a.id);
+  const ic=S.items.filter(i=>aids.includes(i.areaId)).length;
+  if(!confirm(`PSA „${p.name}" löschen?\n${bids.length} Gebäude, ${ic} Einträge werden entfernt.`))return;
+  S.psas=S.psas.filter(x=>x.id!==id);
+  S.blds=S.blds.filter(x=>x.psaId!==id);
+  S.areas=S.areas.filter(x=>!bids.includes(x.bldId));
+  S.items=S.items.filter(x=>!aids.includes(x.areaId));
+  save();renderPSAs();toast('PSA gelöscht');
+}
+function renPSA(id){
+  const p=S.psas.find(x=>x.id===id);
+  const n=prompt('Neuer Name:',p.name);if(!n?.trim())return;
+  p.name=n.trim();save();renderPSAs();
+}
+function renderPSAs(){
+  const el=document.getElementById('psa-list');
+  document.getElementById('psa-lbl').textContent=`PSA (${S.psas.length})`;
+  if(!S.psas.length){el.innerHTML='<div class="empty"><div class="empty-i">🦺</div>Noch keine PSA angelegt — oben Name eingeben und „Hinzufügen" klicken</div>';return;}
+  el.innerHTML=S.psas.map(p=>{
+    const bids=S.blds.filter(b=>b.psaId===p.id).map(b=>b.id);
+    const aids=S.areas.filter(a=>bids.includes(a.bldId)).map(a=>a.id);
+    const ic=S.items.filter(i=>aids.includes(i.areaId)).length;
+    return`<div class="card">
+      <div class="row-main">
+        <span class="row-name">🦺 ${esc(p.name)}</span>
+        <span class="badge">${bids.length} Gebäude · ${ic} Einträge</span>
+        <button class="btn-open" onclick="openPSA('${p.id}')">Öffnen →</button>
+      </div>
+      <div class="row-act">
+        <button class="btn btn-g btn-sm" onclick="renPSA('${p.id}')">✎ Umbenennen</button>
+        <button class="btn btn-d btn-sm" onclick="delPSA('${p.id}')">✕ Löschen</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── GEBÄUDE ────────────────────────────────────────
+function addBld(){
+  const inp=document.getElementById('inp-bld');
+  const n=inp.value.trim();if(!n){inp.focus();return;}
+  S.blds.push({id:uid(),psaId:curPsaId,name:n});save();inp.value='';renderBlds();toast('✓ Gebäude angelegt');
+}
+function delBld(id){
+  const b=S.blds.find(x=>x.id===id);
+  const aids=S.areas.filter(a=>a.bldId===id).map(a=>a.id);
+  const ic=S.items.filter(i=>aids.includes(i.areaId)).length;
+  if(!confirm(`Gebäude „${b.name}"${ic?` mit ${ic} Einträgen`:''} löschen?`))return;
+  S.blds=S.blds.filter(x=>x.id!==id);
+  S.areas=S.areas.filter(x=>x.bldId!==id);
+  S.items=S.items.filter(x=>!aids.includes(x.areaId));
+  save();renderBlds();toast('Gebäude gelöscht');
+}
+function renBld(id){
+  const b=S.blds.find(x=>x.id===id);
+  const n=prompt('Neuer Name:',b.name);if(!n?.trim())return;
+  b.name=n.trim();save();renderBlds();
+}
+function renderBlds(){
+  const el=document.getElementById('bld-list');
+  const list=S.blds.filter(b=>b.psaId===curPsaId);
+  document.getElementById('bld-lbl').textContent=`Gebäude (${list.length})`;
+  if(!list.length){el.innerHTML='<div class="empty"><div class="empty-i">🏢</div>Noch keine Gebäude angelegt</div>';return;}
+  el.innerHTML=list.map(b=>{
+    const aids=S.areas.filter(a=>a.bldId===b.id).map(a=>a.id);
+    const ic=S.items.filter(i=>aids.includes(i.areaId)).length;
+    return`<div class="card">
+      <div class="row-main">
+        <span class="row-name">🏢 ${esc(b.name)}</span>
+        <span class="badge">${aids.length} Bereiche · ${ic} Einträge</span>
+        <button class="btn-open" onclick="openBld('${b.id}')">Öffnen →</button>
+      </div>
+      <div class="row-act">
+        <button class="btn btn-g btn-sm" onclick="renBld('${b.id}')">✎ Umbenennen</button>
+        <button class="btn btn-d btn-sm" onclick="delBld('${b.id}')">✕ Löschen</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── BEREICHE ───────────────────────────────────────
+function addArea(){
+  const inp=document.getElementById('inp-area');
+  const n=inp.value.trim();if(!n){inp.focus();return;}
+  S.areas.push({id:uid(),bldId:curBldId,name:n});save();inp.value='';renderAreas();toast('✓ Bereich angelegt');
+}
+function delArea(id){
+  const a=S.areas.find(x=>x.id===id);
+  const ic=S.items.filter(i=>i.areaId===id).length;
+  if(!confirm(`Bereich „${a.name}"${ic?` mit ${ic} Einträgen`:''} löschen?`))return;
+  S.areas=S.areas.filter(x=>x.id!==id);S.items=S.items.filter(x=>x.areaId!==id);
+  save();renderAreas();toast('Bereich gelöscht');
+}
+function renArea(id){
+  const a=S.areas.find(x=>x.id===id);
+  const n=prompt('Neuer Name:',a.name);if(!n?.trim())return;
+  a.name=n.trim();save();renderAreas();
+}
+function renderAreas(){
+  const el=document.getElementById('area-list');
+  const list=S.areas.filter(a=>a.bldId===curBldId);
+  document.getElementById('area-lbl').textContent=`Bereiche (${list.length})`;
+  if(!list.length){el.innerHTML='<div class="empty"><div class="empty-i">📂</div>Noch keine Bereiche angelegt</div>';return;}
+  el.innerHTML=list.map(a=>{
+    const ic=S.items.filter(i=>i.areaId===a.id).length;
+    return`<div class="card">
+      <div class="row-main">
+        <span class="row-name">${esc(a.name)}</span>
+        <span class="badge">${ic} Einträge</span>
+        <button class="btn-open" onclick="openArea('${a.id}')">Öffnen →</button>
+      </div>
+      <div class="row-act">
+        <button class="btn btn-g btn-sm" onclick="renArea('${a.id}')">✎ Umbenennen</button>
+        <button class="btn btn-d btn-sm" onclick="delArea('${a.id}')">✕ Löschen</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── EINTRÄGE ───────────────────────────────────────
+function addItem(){
+  const mat=document.getElementById('inp-mat').value.trim();
+  const desc=document.getElementById('inp-desc').value.trim();
+  const qty=document.getElementById('inp-qty').value.trim();
+  if(!mat){toast('⚠ Materialnummer fehlt');document.getElementById('inp-mat').focus();return;}
+  const q=parseFloat(qty);
+  if(!qty||isNaN(q)){toast('⚠ Menge fehlt / ungültig');document.getElementById('inp-qty').focus();return;}
+  S.items.push({id:uid(),areaId:curAreaId,matnr:mat,desc,qty:q,ts:Date.now()});
+  save();clearForm();renderItems();toast(`✓ ${mat} × ${fmtN(q)} übernommen`);
+  document.getElementById('inp-mat').focus();
+}
+function delItem(id){S.items=S.items.filter(i=>i.id!==id);save();renderItems();toast('Gelöscht');}
+function clearForm(){['inp-mat','inp-desc','inp-qty'].forEach(id=>document.getElementById(id).value='');}
+function renderItems(){
+  const items=S.items.filter(i=>i.areaId===curAreaId).sort((a,b)=>b.ts-a.ts);
+  const tbody=document.getElementById('items-body');
+  const empty=document.getElementById('items-empty');
+  document.getElementById('items-lbl').textContent=`Einträge (${items.length})`;
+  if(!items.length){tbody.innerHTML='';empty.style.display='';return;}
+  empty.style.display='none';
+  tbody.innerHTML=items.map(it=>`
+    <tr>
+      <td><span class="mn">${esc(it.matnr)}</span></td>
+      <td style="color:var(--tm)">${esc(it.desc||'—')}</td>
+      <td style="text-align:right;font-family:var(--mono);font-weight:700">${fmtN(it.qty)}</td>
+      <td><button class="del" onclick="delItem('${it.id}')">✕</button></td>
+    </tr>`).join('');
+}
+
+// ── AGGREGATE — gruppiert nach PSA + Materialnummer ─
+function agg(){
+  const m={};
+  for(const it of S.items){
+    const area=S.areas.find(a=>a.id===it.areaId);
+    const bld=area?S.blds.find(b=>b.id===area.bldId):null;
+    const psa=bld?S.psas.find(p=>p.id===bld.psaId):null;
+    const psaName=psa?psa.name:'?';
+    const key=`${psaName}||${it.matnr}`;
+    if(!m[key])m[key]={psaName,matnr:it.matnr,desc:'',total:0,locs:[]};
+    m[key].total+=it.qty;
+    if(!m[key].desc&&it.desc)m[key].desc=it.desc;
+    const locKey=`${psaName} / ${bld?bld.name:'?'} / ${area?area.name:'?'}`;
+    const existing=m[key].locs.find(l=>l.key===locKey);
+    if(existing)existing.qty+=it.qty;
+    else m[key].locs.push({key:locKey,qty:it.qty});
+  }
+  return Object.values(m).sort((a,b)=>{
+    const k=a.psaName.localeCompare(b.psaName,undefined,{numeric:true});
+    return k!==0?k:a.matnr.localeCompare(b.matnr,undefined,{numeric:true,sensitivity:'base'});
+  });
+}
+
+// ── SUMMARY ────────────────────────────────────────
+function renderSum(){
+  const rows=agg();
+  const matnrCount=[...new Set(rows.map(r=>r.matnr))].length;
+  const descCount=[...new Set(rows.filter(r=>r.desc).map(r=>r.desc))].length;
+  document.getElementById('stats').innerHTML=[
+    [S.psas.length,'PSA'],
+    [matnrCount,'Materialnr.'],
+    [descCount,'Bezeichnungen']
+  ].map(([v,l])=>`<div class="stat"><div class="stat-v">${v}</div><div class="stat-l">${l}</div></div>`).join('');
+  const tbody=document.getElementById('sum-body');
+  const empty=document.getElementById('sum-empty');
+  if(!rows.length){tbody.innerHTML='';empty.style.display='';return;}
+  empty.style.display='none';
+
+  let html='';
+  for(const r of rows){
+    const sysKey=`${r.psaName}||${r.matnr}`;
+    const sys=S.sysQty[sysKey];const has=sys!==undefined;
+    const diff=has?r.total-sys:null;
+    const dc=diff===null?'dz':diff>0?'dp':diff<0?'dn':'dz';
+    const ds=diff===null?'—':(diff>0?'+':'')+fmtN(diff);
+
+    // Detail rows — one per location
+    for(const loc of r.locs){
+      const parts=loc.key.split(' / '); // PSA / Gebäude / Bereich
+      html+=`<tr style="background:var(--s2)">
+        <td style="color:var(--tm);font-size:12px;padding-left:18px">${esc(parts[0]||'')}</td>
+        <td><span class="mn">${esc(r.matnr)}</span></td>
+        <td style="color:var(--tm);font-size:12px">${esc(r.desc||'—')}</td>
+        <td style="font-size:11px;color:var(--tm)">${esc(parts[1]||'')} / ${esc(parts[2]||'')}</td>
+        <td style="text-align:right;font-family:var(--mono);color:var(--tm)">${fmtN(loc.qty)}</td>
+        <td></td><td></td>
+      </tr>`;
+    }
+
+    // Subtotal / summary row
+    html+=`<tr style="border-top:2px solid var(--a-bd);background:var(--a-bg)">
+      <td style="font-weight:700;font-size:13px">${esc(r.psaName)}</td>
+      <td><span class="mn">${esc(r.matnr)}</span></td>
+      <td style="color:var(--tm);font-size:12px">${esc(r.desc||'—')}</td>
+      <td style="font-size:11px;color:var(--tm);font-weight:600">∑ Gesamt (${r.locs.length} Standort${r.locs.length!==1?'e':''})</td>
+      <td style="text-align:right;font-family:var(--mono);font-weight:700;color:var(--a);font-size:15px">${fmtN(r.total)}</td>
+      <td><input class="sys-inp" type="number" step="any" min="0"
+        value="${has?sys:''}" placeholder="—"
+        data-key="${esc(sysKey)}" onchange="setSys(this)"></td>
+      <td class="diff ${dc}" id="diff-${esc(sysKey)}" style="font-size:15px">${ds}</td>
+    </tr>
+    <tr><td colspan="7" style="padding:0;height:8px;background:var(--bg)"></td></tr>`;
+  }
+  tbody.innerHTML=html;
+}
+function setSys(inp){
+  const key=inp.getAttribute('data-key');
+  const v=inp.value.trim();
+  if(!v||isNaN(parseFloat(v)))delete S.sysQty[key];else S.sysQty[key]=parseFloat(v);
+  save();
+  const r=agg().find(x=>`${x.psaName}||${x.matnr}`===key);if(!r)return;
+  const sys=S.sysQty[key];const has=sys!==undefined;
+  const diff=has?r.total-sys:null;
+  const dc=diff===null?'dz':diff>0?'dp':diff<0?'dn':'dz';
+  const ds=diff===null?'—':(diff>0?'+':'')+fmtN(diff);
+  const cell=document.getElementById('diff-'+key);
+  if(cell){cell.textContent=ds;cell.className='diff '+dc;}
+}
+
+// ── CSV EXPORT — mit Zwischensummen wie auf dem Bildschirm ──
+function exportCSV(){
+  if(!S.items.length){toast('⚠ Keine Daten vorhanden');return;}
+  const lines=[['PSA','Materialnr','Bezeichnung','Gebäude','Bereich','Menge','Systembestand','Differenz (Gezählt-System)'].map(cv).join(';')];
+  const rows=agg();
+
+  for(const r of rows){
+    const sysKey=`${r.psaName}||${r.matnr}`;
+    const sys=S.sysQty[sysKey];const has=sys!==undefined;
+    const diff=has?r.total-sys:'';
+
+    // Detail rows per location — Systembestand + Differenz leer
+    for(const loc of r.locs){
+      const parts=loc.key.split(' / '); // PSA / Gebäude / Bereich
+      lines.push([parts[0]||'',r.matnr,r.desc||'',parts[1]||'',parts[2]||'',fmtN(loc.qty),'',''].map(cv).join(';'));
+    }
+
+    // Subtotal row — Gesamtmenge + Systembestand + Differenz
+    const psaNames=[...new Set(r.locs.map(l=>l.key.split(' / ')[0]))].join(', ');
+    lines.push([
+      psaNames,
+      r.matnr,
+      r.desc||'',
+      `∑ Gesamt (${r.locs.length} Standort${r.locs.length!==1?'e':''})`,
+      '',
+      fmtN(r.total),
+      has?fmtN(sys):'',
+      diff!==''?fmtN(diff):''
+    ].map(cv).join(';'));
+
+    // Empty separator row
+    lines.push('');
+  }
+
+  const blob=new Blob(['\uFEFF'+lines.join('\r\n')],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=`Inventur_${new Date().toISOString().slice(0,10)}.csv`;a.click();
+  URL.revokeObjectURL(url);toast('✓ CSV wird heruntergeladen');
+}
+function clearAll(){
+  if(!confirm('Alle Daten unwiderruflich löschen?'))return;
+  S={psas:[],blds:[],areas:[],items:[],sysQty:{}};save();gotoHome();toast('Alle Daten gelöscht');
+}
+
+// ── SCANNER ────────────────────────────────────────
+function parseQR(raw){
+  const s=raw.trim();
+  if(/[A-Z_]+:[^;,]+/i.test(s)){
+    const p={};s.split(/[;,]/).forEach(x=>{const[k,...v]=x.split(':');p[k.trim().toUpperCase()]=v.join(':').trim();});
+    const mn=p['MATNR']||p['MAT']||p['NR']||p['ID']||'';
+    const desc=p['DESC']||p['NAME']||p['BEZEICHNUNG']||'';
+    if(mn)return{matnr:mn,desc};
+  }
+  if(/[;|]/.test(s)){const p=s.split(/[;|]/);return{matnr:p[0].trim(),desc:(p[1]||'').trim()};}
+  return{matnr:s,desc:''};
+}
+function openScan(target){
+  scanTarget=target;
+  const titles={mat:'Materialnummer scannen',desc:'Bezeichnung scannen',psa:'PSA-Name scannen'};
+  const hints={mat:'QR „Materialnr;Bezeichnung" füllt beide Felder',desc:'',psa:''};
+  document.getElementById('scan-title').textContent=titles[target]||'QR scannen';
+  document.getElementById('scan-hint').textContent=hints[target]||'';
+  document.getElementById('scan-msg').textContent='Kamera wird gestartet …';
+  document.getElementById('scan-msg').className='scan-st';
+  document.getElementById('ov').classList.add('on');
+  startCam();
+}
+function closeScan(){
+  document.getElementById('ov').classList.remove('on');
+  if(camRAF){cancelAnimationFrame(camRAF);camRAF=null;}
+  if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null;}
+  const v=document.getElementById('qv');if(v)v.srcObject=null;
+}
+async function startCam(){
+  try{
+    camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280}}});
+    const v=document.getElementById('qv');v.srcObject=camStream;await v.play();
+    document.getElementById('scan-msg').textContent='QR-Code vor die Kamera halten …';
+    scanLoop();
+  }catch(e){
+    const m=document.getElementById('scan-msg');m.textContent='Kamerazugriff verweigert: '+e.message;m.className='scan-st err';
+  }
+}
+function scanLoop(){
+  const v=document.getElementById('qv'),c=document.getElementById('qc');
+  if(v.readyState>=2&&typeof jsQR!=='undefined'){
+    c.width=v.videoWidth;c.height=v.videoHeight;
+    const ctx=c.getContext('2d');ctx.drawImage(v,0,0);
+    const code=jsQR(ctx.getImageData(0,0,c.width,c.height).data,c.width,c.height,{inversionAttempts:'dontInvert'});
+    if(code){handleQR(code.data);return;}
+  }
+  camRAF=requestAnimationFrame(scanLoop);
+}
+function handleQR(raw){
+  const p=parseQR(raw);
+  const msg=document.getElementById('scan-msg');
+  if(scanTarget==='psa'){
+    document.getElementById('inp-psa').value=p.matnr;
+    msg.textContent='✓ '+p.matnr;msg.className='scan-st ok';
+    setTimeout(()=>{closeScan();document.getElementById('inp-psa').focus();},700);
+  }else if(scanTarget==='mat'){
+    document.getElementById('inp-mat').value=p.matnr;
+    if(p.desc)document.getElementById('inp-desc').value=p.desc;
+    msg.textContent=`✓ ${p.matnr}${p.desc?' · '+p.desc:''}`;msg.className='scan-st ok';
+    setTimeout(()=>{closeScan();document.getElementById('inp-qty').focus();},700);
+  }else{
+    document.getElementById('inp-desc').value=p.matnr;
+    msg.textContent='✓ '+p.matnr;msg.className='scan-st ok';
+    setTimeout(()=>{closeScan();document.getElementById('inp-qty').focus();},700);
+  }
+}
+
+// ── HELPERS ────────────────────────────────────────
+function uid(){return'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmtN(n){if(Number.isInteger(n))return String(n);return String(parseFloat(n.toFixed(4)));}
+function cv(s){const x=String(s).replace(/"/g,'""');return/[;\n"]/g.test(x)?`"${x}"`:x;}
+function toast(msg){
+  const el=document.getElementById('toast');el.textContent=msg;el.classList.add('on');
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('on'),2500);
+}
+
+load();gotoHome();
+
+if('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+
+</script>
+</body>
+</html>
