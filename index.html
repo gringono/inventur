@@ -306,19 +306,25 @@ input::placeholder{color:var(--td)}
 </div>
 </div>
 
-<!-- SCANNER -->
+<!-- SCANNER — iOS-kompatibel via Foto-Input -->
 <div class="ov" id="ov">
   <div class="modal">
     <div class="modal-hdr">
       <span class="modal-title" id="scan-title">QR-Code scannen</span>
       <button class="modal-x" onclick="closeScan()">✕</button>
     </div>
-    <div class="cam-wrap">
-      <video id="qv" autoplay muted playsinline></video>
-      <canvas id="qc"></canvas>
-      <div class="cam-frame"><div class="cam-box"></div></div>
+    <!-- Hidden file input — öffnet native iOS Kamera im Foto-Modus -->
+    <input type="file" id="qr-file-input" accept="image/*" capture="environment"
+      style="display:none" onchange="handleFileInput(this)">
+    <canvas id="qc" style="display:none"></canvas>
+    <!-- Scan Button -->
+    <div style="text-align:center;padding:20px 0 10px">
+      <button onclick="document.getElementById('qr-file-input').click()"
+        style="background:var(--a);color:#fff;border:none;border-radius:10px;padding:18px 32px;font-size:18px;font-weight:700;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:10px">
+        📷 Kamera öffnen
+      </button>
     </div>
-    <div class="scan-st" id="scan-msg">Kamera wird gestartet …</div>
+    <div class="scan-st" id="scan-msg">Kamera-Button antippen um QR-Code zu fotografieren</div>
     <div class="scan-hint" id="scan-hint"></div>
   </div>
 </div>
@@ -329,7 +335,7 @@ input::placeholder{color:var(--td)}
 const DB='inv_v5';
 let S={psas:[],blds:[],areas:[],items:[],sysQty:{}};
 let curPsaId=null,curBldId=null,curAreaId=null,scanTarget='mat';
-let camStream=null,camRAF=null,toastTimer=null;
+let toastTimer=null;
 
 function save(){try{localStorage.setItem(DB,JSON.stringify(S));}catch(e){toast('⚠ Speicherfehler');}}
 function load(){try{const r=localStorage.getItem(DB);if(r)S=JSON.parse(r);}catch(e){}}
@@ -718,36 +724,48 @@ function openScan(target){
   const hints={mat:'QR „Materialnr;Bezeichnung" füllt beide Felder',desc:'',psa:''};
   document.getElementById('scan-title').textContent=titles[target]||'QR scannen';
   document.getElementById('scan-hint').textContent=hints[target]||'';
-  document.getElementById('scan-msg').textContent='Kamera wird gestartet …';
+  document.getElementById('scan-msg').textContent='Kamera-Button antippen um QR-Code zu fotografieren';
   document.getElementById('scan-msg').className='scan-st';
+  // Reset file input so same file can be selected again
+  document.getElementById('qr-file-input').value='';
   document.getElementById('ov').classList.add('on');
-  startCam();
 }
 function closeScan(){
   document.getElementById('ov').classList.remove('on');
-  if(camRAF){cancelAnimationFrame(camRAF);camRAF=null;}
-  if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null;}
-  const v=document.getElementById('qv');if(v)v.srcObject=null;
 }
-async function startCam(){
-  try{
-    camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280}}});
-    const v=document.getElementById('qv');v.srcObject=camStream;await v.play();
-    document.getElementById('scan-msg').textContent='QR-Code vor die Kamera halten …';
-    scanLoop();
-  }catch(e){
-    const m=document.getElementById('scan-msg');m.textContent='Kamerazugriff verweigert: '+e.message;m.className='scan-st err';
-  }
-}
-function scanLoop(){
-  const v=document.getElementById('qv'),c=document.getElementById('qc');
-  if(v.readyState>=2&&typeof jsQR!=='undefined'){
-    c.width=v.videoWidth;c.height=v.videoHeight;
-    const ctx=c.getContext('2d');ctx.drawImage(v,0,0);
-    const code=jsQR(ctx.getImageData(0,0,c.width,c.height).data,c.width,c.height,{inversionAttempts:'dontInvert'});
-    if(code){handleQR(code.data);return;}
-  }
-  camRAF=requestAnimationFrame(scanLoop);
+function handleFileInput(input){
+  const file=input.files[0];
+  if(!file)return;
+  const msg=document.getElementById('scan-msg');
+  msg.textContent='Bild wird ausgelesen …';
+  msg.className='scan-st';
+  const reader=new FileReader();
+  reader.onload=function(e){
+    const img=new Image();
+    img.onload=function(){
+      const c=document.getElementById('qc');
+      // Use full resolution for better QR detection
+      c.width=img.width;
+      c.height=img.height;
+      const ctx=c.getContext('2d');
+      ctx.drawImage(img,0,0);
+      const imageData=ctx.getImageData(0,0,c.width,c.height);
+      if(typeof jsQR==='undefined'){
+        msg.textContent='⚠ Scanner-Bibliothek noch nicht geladen, bitte nochmal versuchen';
+        msg.className='scan-st err';
+        return;
+      }
+      const code=jsQR(imageData.data,imageData.width,imageData.height,{inversionAttempts:'attemptBoth'});
+      if(code){
+        handleQR(code.data);
+      }else{
+        msg.textContent='⚠ Kein QR-Code erkannt — nochmal versuchen, mehr Licht oder näher ran';
+        msg.className='scan-st err';
+      }
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
 }
 function handleQR(raw){
   const p=parseQR(raw);
