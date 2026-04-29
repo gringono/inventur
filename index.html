@@ -171,6 +171,7 @@ input::placeholder{color:var(--td)}
   <button class="btn-home" onclick="gotoHome()" title="Startseite">🏠 <span>Start</span></button>
   <div class="hdr-sep"></div>
   <div class="hdr-crumbs" id="hdr-crumbs"></div>
+  <span style="font-size:10px;font-family:monospace;color:#aaa;flex-shrink:0;margin-right:4px">v27</span>
   <button class="btn-export-hdr" onclick="exportCSV()">⬇ CSV</button>
 </div>
 
@@ -451,6 +452,18 @@ function setMsg(txt,cls){
   const m=document.getElementById('scan-msg');
   m.textContent=txt;
   m.className='scan-st'+(cls?' '+cls:'');
+}
+
+function parseQR(raw){
+  const s=raw.trim();
+  if(/[A-Z_]+:[^;,]+/i.test(s)){
+    const p={};s.split(/[;,]/).forEach(x=>{const[k,...v]=x.split(':');p[k.trim().toUpperCase()]=v.join(':').trim();});
+    const mn=p['MATNR']||p['MAT']||p['NR']||p['ID']||'';
+    const desc=p['DESC']||p['NAME']||p['BEZEICHNUNG']||'';
+    if(mn)return{matnr:mn,desc};
+  }
+  if(/[;|]/.test(s)){const p=s.split(/[;|]/);return{matnr:p[0].trim(),desc:(p[1]||'').trim()};}
+  return{matnr:s,desc:''};
 }
 
 function handleQR(raw){
