@@ -329,59 +329,82 @@ const DB='inv_v5';
 let S={psas:[],blds:[],areas:[],items:[],sysQty:{}};
 let curPsaId=null,curBldId=null,curAreaId=null,scanTarget='mat';
 let html5Scanner=null,toastTimer=null;
-let scanStream=null,scanTimer=null,barcodeDetector=null;
+let scanStream=null,scanTimer=null;
 
-// ── SCANNER OPEN ────────────────────────────────────
 function openScan(target){
   scanTarget=target;
   const titles={mat:'Materialnummer scannen',desc:'Bezeichnung scannen',psa:'PSA-Name scannen'};
   const hints={mat:'QR „Materialnr;Bezeichnung" füllt beide Felder',desc:'',psa:''};
   document.getElementById('scan-title').textContent=titles[target]||'QR scannen';
   document.getElementById('scan-hint').textContent=hints[target]||'';
-  setMsg('Kamera wird gestartet …','');
   document.getElementById('cam-wrap').style.display='none';
   document.getElementById('ov').classList.add('on');
-  startScanner();
-}
 
-async function startScanner(){
-  try{
-    // Kamera-Stream starten
-    scanStream=await navigator.mediaDevices.getUserMedia({
-      video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}
-    });
-    const v=document.getElementById('qv');
-    v.srcObject=scanStream;
-    // iOS braucht explizites play() nach srcObject
-    v.onloadedmetadata=async ()=>{
-      await v.play();
-      document.getElementById('cam-wrap').style.display='block';
-      setMsg('QR-Code in den Rahmen halten …','');
-      // BarcodeDetector (nativ, iOS 17+) oder jsQR als Fallback
-      if('BarcodeDetector' in window){
-        barcodeDetector=new BarcodeDetector({formats:['qr_code']});
-        scanWithBarcodeDetector(v);
-      } else {
-        loadJsQR().then(()=>scanWithJsQR(v)).catch(e=>setMsg('⚠ '+e.message,'err'));
-      }
-    };
-  }catch(e){
-    setMsg('⚠ Kamerazugriff verweigert. Bitte in Einstellungen → Safari → Kamera erlauben.','err');
+  // Zeige sofort was verfügbar ist
+  const hasBD = 'BarcodeDetector' in window;
+  const hasGUM = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  setMsg(`BarcodeDetector: ${hasBD?'✓':'✗'}  Kamera-API: ${hasGUM?'✓':'✗'}  Starte …`,'');
+
+  if(!hasGUM){
+    setMsg('⚠ Kamera-API nicht verfügbar. Bitte in Safari öffnen (nicht in einer anderen App).','err');
+    return;
   }
-}
 
-// ── NATIVE BarcodeDetector (iOS 17+, schnellste Methode) ──
-function scanWithBarcodeDetector(v){
-  if(!scanStream)return;
-  barcodeDetector.detect(v).then(codes=>{
-    if(codes.length>0){handleQR(codes[0].rawValue);return;}
-    scanTimer=setTimeout(()=>scanWithBarcodeDetector(v),150);
-  }).catch(()=>{
-    scanTimer=setTimeout(()=>scanWithBarcodeDetector(v),150);
+  navigator.mediaDevices.getUserMedia({
+    video:{facingMode:{ideal:'environment'}}
+  }).then(stream=>{
+    scanStream=stream;
+    const v=document.getElementById('qv');
+    v.srcObject=stream;
+    v.setAttribute('playsinline','');
+    v.setAttribute('webkit-playsinline','');
+    v.muted=true;
+
+    v.play().then(()=>{
+      document.getElementById('cam-wrap').style.display='block';
+      setMsg('Video läuft. Warte auf Bild …','');
+      // Warte bis Video wirklich Pixel hat
+      waitForDimensions(v, hasBD);
+    }).catch(e=>{
+      setMsg('⚠ Video play() Fehler: '+e.message,'err');
+    });
+  }).catch(e=>{
+    setMsg('⚠ Kamera verweigert: '+e.message+' — Einstellungen → Safari → Kamera → Erlauben','err');
   });
 }
 
-// ── jsQR FALLBACK ────────────────────────────────────
+function waitForDimensions(v, hasBD){
+  if(!scanStream)return;
+  if(v.videoWidth>0 && v.videoHeight>0){
+    setMsg(`Bild: ${v.videoWidth}×${v.videoHeight}. Scanne mit ${hasBD?'BarcodeDetector':'jsQR'} …`,'');
+    if(hasBD){
+      const bd=new BarcodeDetector({formats:['qr_code']});
+      scanBD(v,bd);
+    }else{
+      loadJsQR().then(()=>{
+        setMsg('jsQR geladen. QR-Code halten …','');
+        scanJsQR(v);
+      }).catch(e=>setMsg('⚠ jsQR Fehler: '+e.message,'err'));
+    }
+  }else{
+    scanTimer=setTimeout(()=>waitForDimensions(v,hasBD),100);
+  }
+}
+
+function scanBD(v,bd){
+  if(!scanStream)return;
+  const c=document.getElementById('qc');
+  c.width=v.videoWidth; c.height=v.videoHeight;
+  const ctx=c.getContext('2d');
+  ctx.drawImage(v,0,0);
+  bd.detect(c).then(codes=>{
+    if(codes.length>0){handleQR(codes[0].rawValue);return;}
+    scanTimer=setTimeout(()=>scanBD(v,bd),200);
+  }).catch(()=>{
+    scanTimer=setTimeout(()=>scanBD(v,bd),200);
+  });
+}
+
 function loadJsQR(){
   return new Promise((resolve,reject)=>{
     if(typeof jsQR!=='undefined'){resolve();return;}
@@ -392,27 +415,27 @@ function loadJsQR(){
       const s2=document.createElement('script');
       s2.src='https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
       s2.onload=()=>resolve();
-      s2.onerror=()=>reject(new Error('jsQR nicht ladbar'));
+      s2.onerror=()=>reject(new Error('jsQR nicht ladbar — kein Internet?'));
       document.head.appendChild(s2);
     };
     document.head.appendChild(s);
   });
 }
 
-function scanWithJsQR(v){
+function scanJsQR(v){
   if(!scanStream)return;
-  if(v.readyState>=2&&v.videoWidth>0&&v.videoHeight>0){
+  if(v.videoWidth>0){
     const c=document.getElementById('qc');
-    c.width=v.videoWidth;c.height=v.videoHeight;
+    c.width=v.videoWidth; c.height=v.videoHeight;
     const ctx=c.getContext('2d',{willReadFrequently:true});
     ctx.drawImage(v,0,0);
     try{
       const d=ctx.getImageData(0,0,c.width,c.height);
       const code=jsQR(d.data,d.width,d.height,{inversionAttempts:'attemptBoth'});
       if(code){handleQR(code.data);return;}
-    }catch(e){}
+    }catch(e){setMsg('⚠ jsQR Fehler: '+e.message,'err');return;}
   }
-  scanTimer=setTimeout(()=>scanWithJsQR(v),200);
+  scanTimer=setTimeout(()=>scanJsQR(v),200);
 }
 
 function closeScan(){
