@@ -312,8 +312,12 @@ input::placeholder{color:var(--td)}
       <span class="modal-title" id="scan-title">QR-Code scannen</span>
       <button class="modal-x" onclick="closeScan()">✕</button>
     </div>
-    <div id="qr-reader" style="width:100%;border-radius:8px;overflow:hidden"></div>
-    <div class="scan-st" id="scan-msg">Kamera wird gestartet …</div>
+    <div class="cam-wrap" id="cam-wrap" style="display:none">
+      <video id="qv" autoplay muted playsinline webkit-playsinline></video>
+      <canvas id="qc" style="display:none"></canvas>
+      <div class="cam-frame"><div class="cam-box"></div></div>
+    </div>
+    <div class="scan-st" id="scan-msg">Wird gestartet …</div>
     <div class="scan-hint" id="scan-hint"></div>
   </div>
 </div>
@@ -325,75 +329,99 @@ const DB='inv_v5';
 let S={psas:[],blds:[],areas:[],items:[],sysQty:{}};
 let curPsaId=null,curBldId=null,curAreaId=null,scanTarget='mat';
 let html5Scanner=null,toastTimer=null;
+let scanStream=null,scanTimer=null,barcodeDetector=null;
 
-// ── html5-qrcode laden ──────────────────────────────
-function loadScanner(){
-  return new Promise((resolve,reject)=>{
-    if(typeof Html5Qrcode!=='undefined'){resolve();return;}
-    const s=document.createElement('script');
-    s.src='https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
-    s.onload=()=>resolve();
-    s.onerror=()=>{
-      // Fallback CDN
-      const s2=document.createElement('script');
-      s2.src='https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js';
-      s2.onload=()=>resolve();
-      s2.onerror=()=>reject(new Error('Scanner-Bibliothek nicht ladbar'));
-      document.head.appendChild(s2);
-    };
-    document.head.appendChild(s);
-  });
-}
-
-// ── SCANNER ────────────────────────────────────────
+// ── SCANNER OPEN ────────────────────────────────────
 function openScan(target){
   scanTarget=target;
   const titles={mat:'Materialnummer scannen',desc:'Bezeichnung scannen',psa:'PSA-Name scannen'};
   const hints={mat:'QR „Materialnr;Bezeichnung" füllt beide Felder',desc:'',psa:''};
   document.getElementById('scan-title').textContent=titles[target]||'QR scannen';
   document.getElementById('scan-hint').textContent=hints[target]||'';
-  setMsg('Wird geladen …','');
+  setMsg('Kamera wird gestartet …','');
+  document.getElementById('cam-wrap').style.display='none';
   document.getElementById('ov').classList.add('on');
+  startScanner();
+}
 
-  loadScanner().then(()=>{
-    startQrScanner();
-  }).catch(e=>{
-    setMsg('⚠ '+e.message,'err');
+async function startScanner(){
+  try{
+    // Kamera-Stream starten
+    scanStream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}}
+    });
+    const v=document.getElementById('qv');
+    v.srcObject=scanStream;
+    // iOS braucht explizites play() nach srcObject
+    v.onloadedmetadata=async ()=>{
+      await v.play();
+      document.getElementById('cam-wrap').style.display='block';
+      setMsg('QR-Code in den Rahmen halten …','');
+      // BarcodeDetector (nativ, iOS 17+) oder jsQR als Fallback
+      if('BarcodeDetector' in window){
+        barcodeDetector=new BarcodeDetector({formats:['qr_code']});
+        scanWithBarcodeDetector(v);
+      } else {
+        loadJsQR().then(()=>scanWithJsQR(v)).catch(e=>setMsg('⚠ '+e.message,'err'));
+      }
+    };
+  }catch(e){
+    setMsg('⚠ Kamerazugriff verweigert. Bitte in Einstellungen → Safari → Kamera erlauben.','err');
+  }
+}
+
+// ── NATIVE BarcodeDetector (iOS 17+, schnellste Methode) ──
+function scanWithBarcodeDetector(v){
+  if(!scanStream)return;
+  barcodeDetector.detect(v).then(codes=>{
+    if(codes.length>0){handleQR(codes[0].rawValue);return;}
+    scanTimer=setTimeout(()=>scanWithBarcodeDetector(v),150);
+  }).catch(()=>{
+    scanTimer=setTimeout(()=>scanWithBarcodeDetector(v),150);
   });
 }
 
-function startQrScanner(){
-  // Alten Scanner aufräumen falls vorhanden
-  if(html5Scanner){
-    html5Scanner.clear();
-    html5Scanner=null;
-  }
-  document.getElementById('qr-reader').innerHTML='';
-
-  html5Scanner=new Html5Qrcode('qr-reader');
-  html5Scanner.start(
-    {facingMode:'environment'},
-    {fps:10, qrbox:{width:250,height:250}, aspectRatio:1.0},
-    (decodedText)=>{
-      handleQR(decodedText);
-    },
-    ()=>{/* scan fehler — ignorieren */}
-  ).then(()=>{
-    setMsg('QR-Code in den Rahmen halten …','');
-  }).catch(e=>{
-    setMsg('⚠ Kamerazugriff verweigert: '+e,'err');
+// ── jsQR FALLBACK ────────────────────────────────────
+function loadJsQR(){
+  return new Promise((resolve,reject)=>{
+    if(typeof jsQR!=='undefined'){resolve();return;}
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js';
+    s.onload=()=>resolve();
+    s.onerror=()=>{
+      const s2=document.createElement('script');
+      s2.src='https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
+      s2.onload=()=>resolve();
+      s2.onerror=()=>reject(new Error('jsQR nicht ladbar'));
+      document.head.appendChild(s2);
+    };
+    document.head.appendChild(s);
   });
+}
+
+function scanWithJsQR(v){
+  if(!scanStream)return;
+  if(v.readyState>=2&&v.videoWidth>0&&v.videoHeight>0){
+    const c=document.getElementById('qc');
+    c.width=v.videoWidth;c.height=v.videoHeight;
+    const ctx=c.getContext('2d',{willReadFrequently:true});
+    ctx.drawImage(v,0,0);
+    try{
+      const d=ctx.getImageData(0,0,c.width,c.height);
+      const code=jsQR(d.data,d.width,d.height,{inversionAttempts:'attemptBoth'});
+      if(code){handleQR(code.data);return;}
+    }catch(e){}
+  }
+  scanTimer=setTimeout(()=>scanWithJsQR(v),200);
 }
 
 function closeScan(){
   document.getElementById('ov').classList.remove('on');
-  if(html5Scanner){
-    html5Scanner.stop().catch(()=>{}).finally(()=>{
-      html5Scanner.clear();
-      html5Scanner=null;
-      document.getElementById('qr-reader').innerHTML='';
-    });
-  }
+  if(scanTimer){clearTimeout(scanTimer);scanTimer=null;}
+  if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null;}
+  const v=document.getElementById('qv');
+  if(v)v.srcObject=null;
+  document.getElementById('cam-wrap').style.display='none';
 }
 
 function setMsg(txt,cls){
@@ -407,14 +435,14 @@ function handleQR(raw){
   setMsg('✓ '+p.matnr+(p.desc?' · '+p.desc:''),'ok');
   if(scanTarget==='psa'){
     document.getElementById('inp-psa').value=p.matnr;
-    setTimeout(closeScan,600);
+    setTimeout(closeScan,500);
   }else if(scanTarget==='mat'){
     document.getElementById('inp-mat').value=p.matnr;
     if(p.desc)document.getElementById('inp-desc').value=p.desc;
-    setTimeout(()=>{closeScan();document.getElementById('inp-qty').focus();},600);
+    setTimeout(()=>{closeScan();document.getElementById('inp-qty').focus();},500);
   }else{
     document.getElementById('inp-desc').value=p.matnr;
-    setTimeout(()=>{closeScan();document.getElementById('inp-qty').focus();},600);
+    setTimeout(()=>{closeScan();document.getElementById('inp-qty').focus();},500);
   }
 }
 
