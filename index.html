@@ -169,7 +169,7 @@ input::placeholder{color:var(--td)}
   <button class="btn-home" onclick="gotoHome()" title="Startseite">🏠 <span>Start</span></button>
   <div class="hdr-sep"></div>
   <div class="hdr-crumbs" id="hdr-crumbs"></div>
-  <span style="font-size:10px;font-family:monospace;color:#aaa;flex-shrink:0;margin-right:4px">v29</span>
+  <span style="font-size:10px;font-family:monospace;color:#aaa;flex-shrink:0;margin-right:4px">v30</span>
   <button class="btn-export-hdr" onclick="exportCSV()">⬇ CSV</button>
 </div>
 
@@ -199,26 +199,12 @@ input::placeholder{color:var(--td)}
 </div>
 </div>
 
-<!-- ═══ VIEW: GEBÄUDE ═══ -->
-<div class="view" id="v-bld">
-<div class="mw">
-  <div class="lbl">Gebäude hinzufügen</div>
-  <div class="add-row">
-    <input type="text" id="inp-bld" placeholder="z.B. Gebäude A, Halle 3, Lager Nord …" maxlength="80"
-      style="flex:1" onkeydown="if(event.key==='Enter')addBld()">
-    <button class="btn btn-p" onclick="addBld()">+ Hinzufügen</button>
-  </div>
-  <div class="lbl" id="bld-lbl">Gebäude</div>
-  <div id="bld-list"></div>
-</div>
-</div>
-
 <!-- ═══ VIEW: BEREICHE ═══ -->
 <div class="view" id="v-area">
 <div class="mw">
   <div class="lbl">Bereich hinzufügen</div>
   <div class="add-row">
-    <input type="text" id="inp-area" placeholder="z.B. Lager, Produktion, EG Raum 12 …" maxlength="80"
+    <input type="text" id="inp-area" placeholder="z.B. Gebäude A / Lager, Halle 3 EG …" maxlength="80"
       style="flex:1" onkeydown="if(event.key==='Enter')addArea()">
     <button class="btn btn-p" onclick="addArea()">+ Hinzufügen</button>
   </div>
@@ -253,6 +239,9 @@ input::placeholder{color:var(--td)}
     <div class="form-btns">
       <button class="btn btn-save" onclick="addItem()">✓ Zählung übernehmen</button>
       <button class="btn btn-g btn-sm" onclick="clearForm()">✕ Leeren</button>
+    </div>
+    <div style="margin-top:10px">
+      <button class="btn btn-g" style="width:100%;justify-content:center;border-color:var(--a);color:var(--a)" onclick="gotoTab('summary')">📋 Zur Zusammenfassung</button>
     </div>
   </div>
 
@@ -324,9 +313,9 @@ input::placeholder{color:var(--td)}
 <div class="toast" id="toast"></div>
 
 <script>
-const DB='inv_v5';
-let S={psas:[],blds:[],areas:[],items:[],sysQty:{}};
-let curPsaId=null,curBldId=null,curAreaId=null,scanTarget='mat';
+const DB='inv_v6';
+let S={psas:[],areas:[],items:[],sysQty:{}};
+let curPsaId=null,curAreaId=null,scanTarget='mat';
 let html5Scanner=null,toastTimer=null;
 let scanStream=null,scanTimer=null;
 
@@ -484,7 +473,7 @@ function save(){try{localStorage.setItem(DB,JSON.stringify(S));}catch(e){toast('
 function load(){try{const r=localStorage.getItem(DB);if(r)S=JSON.parse(r);}catch(e){}}
 
 // ── VIEWS ──────────────────────────────────────────
-const VIEWS=['v-home','v-bld','v-area','v-items','v-sum'];
+const VIEWS=['v-home','v-area','v-items','v-sum'];
 function show(id){VIEWS.forEach(v=>document.getElementById(v).classList.toggle('on',v===id));}
 
 function setCrumbs(parts){
@@ -525,36 +514,21 @@ function openPSA(id){
   showTabs(false);
   setCrumbs([{label:'PSA',fn:'gotoHome()'},{label:p.name}]);
   setCtxNav(`<span class="ctx-nav-label">Weiter zu:</span>
-    <span style="font-size:13px;color:var(--tm)">→ Gebäude auswählen</span>`);
-  show('v-bld');renderBlds();
-}
-function openBld(id){
-  curBldId=id;
-  const p=S.psas.find(x=>x.id===curPsaId);
-  const b=S.blds.find(x=>x.id===id);
-  showTabs(false);
-  setCrumbs([{label:'PSA',fn:'gotoHome()'},{label:p.name,fn:`openPSA('${curPsaId}')`},{label:b.name}]);
-  setCtxNav(`<span class="ctx-nav-label">Wechseln zu:</span>
-    <button class="ctx-btn secondary" onclick="openPSA('${curPsaId}')">← Gebäude wechseln</button>
-    <span class="ctx-sep"></span>
     <span style="font-size:13px;color:var(--tm)">→ Bereich auswählen</span>`);
   show('v-area');renderAreas();
 }
 function openArea(id){
   curAreaId=id;
   const p=S.psas.find(x=>x.id===curPsaId);
-  const b=S.blds.find(x=>x.id===curBldId);
   const a=S.areas.find(x=>x.id===id);
   showTabs(false);
   setCrumbs([
     {label:'PSA',fn:'gotoHome()'},
     {label:p.name,fn:`openPSA('${curPsaId}')`},
-    {label:b.name,fn:`openBld('${curBldId}')`},
     {label:a.name}
   ]);
   setCtxNav(`<span class="ctx-nav-label">Wechseln zu:</span>
-    <button class="ctx-btn secondary" onclick="openPSA('${curPsaId}')">🏢 Gebäude wechseln</button>
-    <button class="ctx-btn" onclick="openBld('${curBldId}')">📂 Bereich wechseln</button>`);
+    <button class="ctx-btn" onclick="openPSA('${curPsaId}')">📂 Bereich wechseln</button>`);
   show('v-items');clearForm();renderItems();
   document.getElementById('inp-mat').focus();
 }
@@ -567,13 +541,11 @@ function addPSA(){
 }
 function delPSA(id){
   const p=S.psas.find(x=>x.id===id);
-  const bids=S.blds.filter(b=>b.psaId===id).map(b=>b.id);
-  const aids=S.areas.filter(a=>bids.includes(a.bldId)).map(a=>a.id);
+  const aids=S.areas.filter(a=>a.psaId===id).map(a=>a.id);
   const ic=S.items.filter(i=>aids.includes(i.areaId)).length;
-  if(!confirm(`PSA „${p.name}" löschen?\n${bids.length} Gebäude, ${ic} Einträge werden entfernt.`))return;
+  if(!confirm(`PSA „${p.name}" löschen?\n${aids.length} Bereiche, ${ic} Einträge werden entfernt.`))return;
   S.psas=S.psas.filter(x=>x.id!==id);
-  S.blds=S.blds.filter(x=>x.psaId!==id);
-  S.areas=S.areas.filter(x=>!bids.includes(x.bldId));
+  S.areas=S.areas.filter(x=>x.psaId!==id);
   S.items=S.items.filter(x=>!aids.includes(x.areaId));
   save();renderPSAs();toast('PSA gelöscht');
 }
@@ -587,13 +559,12 @@ function renderPSAs(){
   document.getElementById('psa-lbl').textContent=`PSA (${S.psas.length})`;
   if(!S.psas.length){el.innerHTML='<div class="empty"><div class="empty-i">🦺</div>Noch keine PSA angelegt — oben Name eingeben und „Hinzufügen" klicken</div>';return;}
   el.innerHTML=S.psas.map(p=>{
-    const bids=S.blds.filter(b=>b.psaId===p.id).map(b=>b.id);
-    const aids=S.areas.filter(a=>bids.includes(a.bldId)).map(a=>a.id);
+    const aids=S.areas.filter(a=>a.psaId===p.id).map(a=>a.id);
     const ic=S.items.filter(i=>aids.includes(i.areaId)).length;
     return`<div class="card">
       <div class="row-main">
         <span class="row-name">🦺 ${esc(p.name)}</span>
-        <span class="badge">${bids.length} Gebäude · ${ic} Einträge</span>
+        <span class="badge">${aids.length} Bereiche · ${ic} Einträge</span>
         <button class="btn-open" onclick="openPSA('${p.id}')">Öffnen →</button>
       </div>
       <div class="row-act">
@@ -604,54 +575,11 @@ function renderPSAs(){
   }).join('');
 }
 
-// ── GEBÄUDE ────────────────────────────────────────
-function addBld(){
-  const inp=document.getElementById('inp-bld');
-  const n=inp.value.trim();if(!n){inp.focus();return;}
-  S.blds.push({id:uid(),psaId:curPsaId,name:n});save();inp.value='';renderBlds();toast('✓ Gebäude angelegt');
-}
-function delBld(id){
-  const b=S.blds.find(x=>x.id===id);
-  const aids=S.areas.filter(a=>a.bldId===id).map(a=>a.id);
-  const ic=S.items.filter(i=>aids.includes(i.areaId)).length;
-  if(!confirm(`Gebäude „${b.name}"${ic?` mit ${ic} Einträgen`:''} löschen?`))return;
-  S.blds=S.blds.filter(x=>x.id!==id);
-  S.areas=S.areas.filter(x=>x.bldId!==id);
-  S.items=S.items.filter(x=>!aids.includes(x.areaId));
-  save();renderBlds();toast('Gebäude gelöscht');
-}
-function renBld(id){
-  const b=S.blds.find(x=>x.id===id);
-  const n=prompt('Neuer Name:',b.name);if(!n?.trim())return;
-  b.name=n.trim();save();renderBlds();
-}
-function renderBlds(){
-  const el=document.getElementById('bld-list');
-  const list=S.blds.filter(b=>b.psaId===curPsaId);
-  document.getElementById('bld-lbl').textContent=`Gebäude (${list.length})`;
-  if(!list.length){el.innerHTML='<div class="empty"><div class="empty-i">🏢</div>Noch keine Gebäude angelegt</div>';return;}
-  el.innerHTML=list.map(b=>{
-    const aids=S.areas.filter(a=>a.bldId===b.id).map(a=>a.id);
-    const ic=S.items.filter(i=>aids.includes(i.areaId)).length;
-    return`<div class="card">
-      <div class="row-main">
-        <span class="row-name">🏢 ${esc(b.name)}</span>
-        <span class="badge">${aids.length} Bereiche · ${ic} Einträge</span>
-        <button class="btn-open" onclick="openBld('${b.id}')">Öffnen →</button>
-      </div>
-      <div class="row-act">
-        <button class="btn btn-g btn-sm" onclick="renBld('${b.id}')">✎ Umbenennen</button>
-        <button class="btn btn-d btn-sm" onclick="delBld('${b.id}')">✕ Löschen</button>
-      </div>
-    </div>`;
-  }).join('');
-}
-
 // ── BEREICHE ───────────────────────────────────────
 function addArea(){
   const inp=document.getElementById('inp-area');
   const n=inp.value.trim();if(!n){inp.focus();return;}
-  S.areas.push({id:uid(),bldId:curBldId,name:n});save();inp.value='';renderAreas();toast('✓ Bereich angelegt');
+  S.areas.push({id:uid(),psaId:curPsaId,name:n});save();inp.value='';renderAreas();toast('✓ Bereich angelegt');
 }
 function delArea(id){
   const a=S.areas.find(x=>x.id===id);
@@ -667,7 +595,7 @@ function renArea(id){
 }
 function renderAreas(){
   const el=document.getElementById('area-list');
-  const list=S.areas.filter(a=>a.bldId===curBldId);
+  const list=S.areas.filter(a=>a.psaId===curPsaId);
   document.getElementById('area-lbl').textContent=`Bereiche (${list.length})`;
   if(!list.length){el.innerHTML='<div class="empty"><div class="empty-i">📂</div>Noch keine Bereiche angelegt</div>';return;}
   el.innerHTML=list.map(a=>{
@@ -721,14 +649,13 @@ function agg(){
   const m={};
   for(const it of S.items){
     const area=S.areas.find(a=>a.id===it.areaId);
-    const bld=area?S.blds.find(b=>b.id===area.bldId):null;
-    const psa=bld?S.psas.find(p=>p.id===bld.psaId):null;
+    const psa=area?S.psas.find(p=>p.id===(area.psaId||area.bldId)):null; // bldId fallback für alte Daten
     const psaName=psa?psa.name:'?';
     const key=`${psaName}||${it.matnr}`;
     if(!m[key])m[key]={psaName,matnr:it.matnr,desc:'',total:0,locs:[]};
     m[key].total+=it.qty;
     if(!m[key].desc&&it.desc)m[key].desc=it.desc;
-    const locKey=`${psaName} / ${bld?bld.name:'?'} / ${area?area.name:'?'}`;
+    const locKey=`${psaName} / ${area?area.name:'?'}`;
     const existing=m[key].locs.find(l=>l.key===locKey);
     if(existing)existing.qty+=it.qty;
     else m[key].locs.push({key:locKey,qty:it.qty});
@@ -764,12 +691,12 @@ function renderSum(){
 
     // Detail rows — one per location
     for(const loc of r.locs){
-      const parts=loc.key.split(' / '); // PSA / Gebäude / Bereich
+      const parts=loc.key.split(' / '); // PSA / Bereich
       html+=`<tr style="background:var(--s2)">
         <td style="color:var(--tm);font-size:12px;padding-left:18px">${esc(parts[0]||'')}</td>
         <td><span class="mn">${esc(r.matnr)}</span></td>
         <td style="color:var(--tm);font-size:12px">${esc(r.desc||'—')}</td>
-        <td style="font-size:11px;color:var(--tm)">${esc(parts[1]||'')} / ${esc(parts[2]||'')}</td>
+        <td style="font-size:11px;color:var(--tm)">${esc(parts[1]||'')}</td>
         <td style="text-align:right;font-family:var(--mono);color:var(--tm)">${fmtN(loc.qty)}</td>
         <td></td><td></td>
       </tr>`;
@@ -808,7 +735,7 @@ function setSys(inp){
 // ── CSV EXPORT — mit Zwischensummen wie auf dem Bildschirm ──
 function exportCSV(){
   if(!S.items.length){toast('⚠ Keine Daten vorhanden');return;}
-  const lines=[['PSA','Materialnr','Bezeichnung','Gebäude','Bereich','Menge','Systembestand','Differenz (Gezählt-System)'].map(cv).join(';')];
+  const lines=[['PSA','Materialnr','Bezeichnung','Bereich','Menge','Systembestand','Differenz (Gezählt-System)'].map(cv).join(';')];
   const rows=agg();
 
   for(const r of rows){
@@ -816,26 +743,17 @@ function exportCSV(){
     const sys=S.sysQty[sysKey];const has=sys!==undefined;
     const diff=has?r.total-sys:'';
 
-    // Detail rows per location — Systembestand + Differenz leer
     for(const loc of r.locs){
-      const parts=loc.key.split(' / '); // PSA / Gebäude / Bereich
-      lines.push([parts[0]||'',r.matnr,r.desc||'',parts[1]||'',parts[2]||'',fmtN(loc.qty),'',''].map(cv).join(';'));
+      const parts=loc.key.split(' / '); // PSA / Bereich
+      lines.push([parts[0]||'',r.matnr,r.desc||'',parts[1]||'',fmtN(loc.qty),'',''].map(cv).join(';'));
     }
 
-    // Subtotal row — Gesamtmenge + Systembestand + Differenz
     const psaNames=[...new Set(r.locs.map(l=>l.key.split(' / ')[0]))].join(', ');
     lines.push([
-      psaNames,
-      r.matnr,
-      r.desc||'',
+      psaNames,r.matnr,r.desc||'',
       `∑ Gesamt (${r.locs.length} Standort${r.locs.length!==1?'e':''})`,
-      '',
-      fmtN(r.total),
-      has?fmtN(sys):'',
-      diff!==''?fmtN(diff):''
+      fmtN(r.total),has?fmtN(sys):'',diff!==''?fmtN(diff):''
     ].map(cv).join(';'));
-
-    // Empty separator row
     lines.push('');
   }
 
@@ -846,7 +764,7 @@ function exportCSV(){
 }
 function clearAll(){
   if(!confirm('Alle Daten unwiderruflich löschen?'))return;
-  S={psas:[],blds:[],areas:[],items:[],sysQty:{}};save();gotoHome();toast('Alle Daten gelöscht');
+  S={psas:[],areas:[],items:[],sysQty:{}};save();gotoHome();toast('Alle Daten gelöscht');
 }
 
 // ── HELPERS ────────────────────────────────────────
