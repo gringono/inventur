@@ -330,6 +330,28 @@ let S={psas:[],blds:[],areas:[],items:[],sysQty:{}};
 let curPsaId=null,curBldId=null,curAreaId=null,scanTarget='mat';
 let camStream=null,camRAF=null,toastTimer=null;
 
+function scanLoop(){
+  const v=document.getElementById('qv'),c=document.getElementById('qc');
+  if(!camStream)return;
+  if(v.readyState>=2 && v.videoWidth>0 && v.videoHeight>0){
+    c.width=v.videoWidth;c.height=v.videoHeight;
+    const ctx=c.getContext('2d');
+    ctx.drawImage(v,0,0);
+    try{
+      const code=jsQR(ctx.getImageData(0,0,c.width,c.height).data,c.width,c.height,{inversionAttempts:'dontInvert'});
+      if(code){handleQR(code.data);return;}
+    }catch(e){}
+  }
+  camRAF=setTimeout(scanLoop,200);
+}
+
+function closeScan(){
+  document.getElementById('ov').classList.remove('on');
+  if(camRAF){clearTimeout(camRAF);camRAF=null;}
+  if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null;}
+  const v=document.getElementById('qv');if(v)v.srcObject=null;
+}
+
 function save(){try{localStorage.setItem(DB,JSON.stringify(S));}catch(e){toast('⚠ Speicherfehler');}}
 function load(){try{const r=localStorage.getItem(DB);if(r)S=JSON.parse(r);}catch(e){}}
 
@@ -748,7 +770,7 @@ function openScan(target){
 }
 function closeScan(){
   document.getElementById('ov').classList.remove('on');
-  if(camRAF){cancelAnimationFrame(camRAF);camRAF=null;}
+  if(camRAF){clearTimeout(camRAF);camRAF=null;}
   if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null;}
   const v=document.getElementById('qv');if(v)v.srcObject=null;
 }
@@ -809,7 +831,8 @@ function handleFileInput(input){
 function scanLoop(){
   const v=document.getElementById('qv'),c=document.getElementById('qc');
   if(!camStream)return;
-  if(v.readyState>=2){
+  // iOS: videoWidth/videoHeight können anfangs 0 sein — überspringen
+  if(v.readyState>=2 && v.videoWidth>0 && v.videoHeight>0){
     c.width=v.videoWidth;c.height=v.videoHeight;
     const ctx=c.getContext('2d');
     ctx.drawImage(v,0,0);
