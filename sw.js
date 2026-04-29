@@ -1,4 +1,4 @@
-const CACHE = 'inventur-v4';
+const CACHE = 'inventur-v5';
 const ASSETS = [
   '/inventur/inventur.html',
   '/inventur/manifest.json',
