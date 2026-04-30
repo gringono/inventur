@@ -148,7 +148,7 @@ input::placeholder{color:var(--td)}
 .cam-wrap{position:relative;width:100%;aspect-ratio:1/1;background:#111;border-radius:10px;overflow:hidden}
 #qv{width:100%;height:100%;object-fit:cover;display:block}#qc{display:none}
 .cam-frame{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
-.cam-box{width:58%;height:58%;border:3px solid var(--a);border-radius:8px;box-shadow:0 0 0 9999px rgba(0,0,0,.5)}
+.cam-box{width:38%;height:38%;border:3px solid var(--a);border-radius:8px;box-shadow:0 0 0 9999px rgba(0,0,0,.6)}
 .scan-st{text-align:center;padding:10px 6px 2px;font-size:13px;color:var(--tm);min-height:32px;font-weight:600}
 .scan-st.ok{color:var(--green)}.scan-st.err{color:var(--red)}
 .scan-hint{text-align:center;font-size:11px;color:var(--td);padding-bottom:4px}
@@ -169,7 +169,7 @@ input::placeholder{color:var(--td)}
   <button class="btn-home" onclick="gotoHome()" title="Startseite">🏠 <span>Start</span></button>
   <div class="hdr-sep"></div>
   <div class="hdr-crumbs" id="hdr-crumbs"></div>
-  <span style="font-size:10px;font-family:monospace;color:#aaa;flex-shrink:0;margin-right:4px">v31</span>
+  <span style="font-size:10px;font-family:monospace;color:#aaa;flex-shrink:0;margin-right:4px">v32</span>
   <button class="btn-export-hdr" onclick="exportCSV()">⬇ CSV</button>
 </div>
 
@@ -382,12 +382,21 @@ function waitForDimensions(v, hasBD){
   }
 }
 
+function getCropRegion(v){
+  // Nur mittlere 38% auswerten — entspricht dem orangen Rahmen
+  const size=Math.min(v.videoWidth,v.videoHeight)*0.38;
+  const x=Math.round((v.videoWidth-size)/2);
+  const y=Math.round((v.videoHeight-size)/2);
+  return{x,y,w:Math.round(size),h:Math.round(size)};
+}
+
 function scanBD(v,bd){
   if(!scanStream)return;
   const c=document.getElementById('qc');
-  c.width=v.videoWidth; c.height=v.videoHeight;
+  const {x,y,w,h}=getCropRegion(v);
+  c.width=w; c.height=h;
   const ctx=c.getContext('2d');
-  ctx.drawImage(v,0,0);
+  ctx.drawImage(v,x,y,w,h,0,0,w,h);
   bd.detect(c).then(codes=>{
     if(codes.length>0){handleQR(codes[0].rawValue);return;}
     scanTimer=setTimeout(()=>scanBD(v,bd),200);
@@ -417,11 +426,12 @@ function scanJsQR(v){
   if(!scanStream)return;
   if(v.videoWidth>0){
     const c=document.getElementById('qc');
-    c.width=v.videoWidth; c.height=v.videoHeight;
+    const {x,y,w,h}=getCropRegion(v);
+    c.width=w; c.height=h;
     const ctx=c.getContext('2d',{willReadFrequently:true});
-    ctx.drawImage(v,0,0);
+    ctx.drawImage(v,x,y,w,h,0,0,w,h);
     try{
-      const d=ctx.getImageData(0,0,c.width,c.height);
+      const d=ctx.getImageData(0,0,w,h);
       const code=jsQR(d.data,d.width,d.height,{inversionAttempts:'attemptBoth'});
       if(code){handleQR(code.data);return;}
     }catch(e){setMsg('⚠ jsQR Fehler: '+e.message,'err');return;}
