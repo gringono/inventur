@@ -169,7 +169,7 @@ input::placeholder{color:var(--td)}
   <button class="btn-home" onclick="gotoHome()" title="Startseite">🏠 <span>Start</span></button>
   <div class="hdr-sep"></div>
   <div class="hdr-crumbs" id="hdr-crumbs"></div>
-  <span style="font-size:10px;font-family:monospace;color:#aaa;flex-shrink:0;margin-right:4px">v30</span>
+  <span style="font-size:10px;font-family:monospace;color:#aaa;flex-shrink:0;margin-right:4px">v31</span>
   <button class="btn-export-hdr" onclick="exportCSV()">⬇ CSV</button>
 </div>
 
@@ -188,7 +188,7 @@ input::placeholder{color:var(--td)}
   <div class="lbl">PSA hinzufügen</div>
   <div class="add-row">
     <div class="scan-row">
-      <input type="text" id="inp-psa" placeholder="z.B. Helm Set A, Warnweste L, Handschuhe …" maxlength="80"
+      <input type="text" id="inp-psa" placeholder="PSAxyz0815" maxlength="80"
         onkeydown="if(event.key==='Enter')addPSA()">
       <button class="scan-btn" onclick="openScan('psa')" title="QR scannen">⊡</button>
     </div>
@@ -204,8 +204,11 @@ input::placeholder{color:var(--td)}
 <div class="mw">
   <div class="lbl">Bereich hinzufügen</div>
   <div class="add-row">
-    <input type="text" id="inp-area" placeholder="z.B. Gebäude A / Lager, Halle 3 EG …" maxlength="80"
-      style="flex:1" onkeydown="if(event.key==='Enter')addArea()">
+    <div class="scan-row">
+      <input type="text" id="inp-area" placeholder="z.B. Gebäude A / Lager, Halle 3 EG …" maxlength="80"
+        onkeydown="if(event.key==='Enter')addArea()">
+      <button class="scan-btn" onclick="openScan('area')" title="QR scannen">⊡</button>
+    </div>
     <button class="btn btn-p" onclick="addArea()">+ Hinzufügen</button>
   </div>
   <div class="lbl" id="area-lbl">Bereiche</div>
@@ -321,8 +324,8 @@ let scanStream=null,scanTimer=null;
 
 function openScan(target){
   scanTarget=target;
-  const titles={mat:'Materialnummer scannen',desc:'Bezeichnung scannen',psa:'PSA-Name scannen'};
-  const hints={mat:'QR „Materialnr;Bezeichnung" füllt beide Felder',desc:'',psa:''};
+  const titles={mat:'Materialnummer scannen',desc:'Bezeichnung scannen',psa:'PSA scannen',area:'Bereich scannen'};
+  const hints={mat:'QR „Materialnr;Bezeichnung" füllt beide Felder',desc:'',psa:'',area:''};
   document.getElementById('scan-title').textContent=titles[target]||'QR scannen';
   document.getElementById('scan-hint').textContent=hints[target]||'';
   document.getElementById('cam-wrap').style.display='none';
@@ -458,6 +461,9 @@ function handleQR(raw){
   setMsg('✓ '+p.matnr+(p.desc?' · '+p.desc:''),'ok');
   if(scanTarget==='psa'){
     document.getElementById('inp-psa').value=p.matnr;
+    setTimeout(closeScan,500);
+  }else if(scanTarget==='area'){
+    document.getElementById('inp-area').value=p.matnr;
     setTimeout(closeScan,500);
   }else if(scanTarget==='mat'){
     document.getElementById('inp-mat').value=p.matnr;
