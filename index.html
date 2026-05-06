@@ -169,7 +169,7 @@ input::placeholder{color:var(--td)}
   <button class="btn-home" onclick="gotoHome()" title="Startseite">🏠 <span>Start</span></button>
   <div class="hdr-sep"></div>
   <div class="hdr-crumbs" id="hdr-crumbs"></div>
-  <span style="font-size:10px;font-family:monospace;color:#aaa;flex-shrink:0;margin-right:4px">v32</span>
+  <span style="font-size:10px;font-family:monospace;color:#aaa;flex-shrink:0;margin-right:4px">v33</span>
   <button class="btn-export-hdr" onclick="exportCSV()">⬇ CSV</button>
 </div>
 
@@ -235,9 +235,12 @@ input::placeholder{color:var(--td)}
       </div>
     </div>
     <div class="fg">
-      <label>Menge</label>
-      <input type="number" id="inp-qty" placeholder="0" min="0" step="any"
-        onkeydown="if(event.key==='Enter')addItem()">
+      <label>Menge(n)</label>
+      <div id="qty-list"></div>
+      <button type="button" onclick="addQtyField()"
+        style="margin-top:7px;background:var(--s2);border:1.5px dashed var(--br2);color:var(--tm);width:100%;padding:9px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:700">
+        + Weitere Menge hinzufügen
+      </button>
     </div>
     <div class="form-btns">
       <button class="btn btn-save" onclick="addItem()">✓ Zählung übernehmen</button>
@@ -546,7 +549,6 @@ function openArea(id){
   setCtxNav(`<span class="ctx-nav-label">Wechseln zu:</span>
     <button class="ctx-btn" onclick="openPSA('${curPsaId}')">📂 Bereich wechseln</button>`);
   show('v-items');clearForm();renderItems();
-  document.getElementById('inp-mat').focus();
 }
 
 // ── PSA ────────────────────────────────────────────
@@ -630,20 +632,54 @@ function renderAreas(){
   }).join('');
 }
 
+// ── DYNAMIC QTY FIELDS ─────────────────────────────
+function addQtyField(val=''){
+  const list=document.getElementById('qty-list');
+  const idx=list.children.length;
+  const row=document.createElement('div');
+  row.style.cssText='display:flex;gap:6px;margin-bottom:6px;align-items:center';
+  row.innerHTML=`
+    <input type="number" min="0" step="any" placeholder="0" value="${val}"
+      style="flex:1;background:var(--s1);border:1.5px solid var(--br);color:var(--tx);padding:10px 12px;border-radius:7px;font-size:15px;font-family:inherit;outline:none"
+      onfocus="this.style.borderColor='var(--a)'" onblur="this.style.borderColor='var(--br)'"
+      onkeydown="if(event.key==='Enter'){event.preventDefault();addQtyField();setTimeout(()=>{const l=document.getElementById('qty-list');if(l.lastElementChild)l.lastElementChild.querySelector('input').focus();},50)}">
+    <button type="button" onclick="this.parentElement.remove()"
+      style="background:var(--rbg);border:1px solid #fca5a5;color:var(--red);width:38px;height:42px;border-radius:7px;cursor:pointer;font-size:16px;flex-shrink:0;display:${idx===0?'none':'flex'};align-items:center;justify-content:center">×</button>`;
+  list.appendChild(row);
+  row.querySelector('input').focus();
+}
+
+function getQtyValues(){
+  const vals=[];
+  document.getElementById('qty-list').querySelectorAll('input').forEach(inp=>{
+    const v=parseFloat(inp.value);
+    if(!isNaN(v)&&v>0)vals.push(v);
+  });
+  return vals;
+}
+
 // ── EINTRÄGE ───────────────────────────────────────
 function addItem(){
   const mat=document.getElementById('inp-mat').value.trim();
   const desc=document.getElementById('inp-desc').value.trim();
-  const qty=document.getElementById('inp-qty').value.trim();
   if(!mat){toast('⚠ Materialnummer fehlt');document.getElementById('inp-mat').focus();return;}
-  const q=parseFloat(qty);
-  if(!qty||isNaN(q)){toast('⚠ Menge fehlt / ungültig');document.getElementById('inp-qty').focus();return;}
-  S.items.push({id:uid(),areaId:curAreaId,matnr:mat,desc,qty:q,ts:Date.now()});
-  save();clearForm();renderItems();toast(`✓ ${mat} × ${fmtN(q)} übernommen`);
+  const vals=getQtyValues();
+  if(!vals.length){toast('⚠ Mindestens eine Menge eingeben');return;}
+  const total=vals.reduce((s,v)=>s+v,0);
+  for(const q of vals){
+    S.items.push({id:uid(),areaId:curAreaId,matnr:mat,desc,qty:q,ts:Date.now()});
+  }
+  save();clearForm();renderItems();
+  toast(`✓ ${mat} — ${vals.length > 1 ? vals.length+' Mengen, Summe: '+fmtN(total) : fmtN(total)+' übernommen'}`);
   document.getElementById('inp-mat').focus();
 }
 function delItem(id){S.items=S.items.filter(i=>i.id!==id);save();renderItems();toast('Gelöscht');}
-function clearForm(){['inp-mat','inp-desc','inp-qty'].forEach(id=>document.getElementById(id).value='');}
+function clearForm(){
+  document.getElementById('inp-mat').value='';
+  document.getElementById('inp-desc').value='';
+  document.getElementById('qty-list').innerHTML='';
+  addQtyField();
+}
 function renderItems(){
   const items=S.items.filter(i=>i.areaId===curAreaId).sort((a,b)=>b.ts-a.ts);
   const tbody=document.getElementById('items-body');
