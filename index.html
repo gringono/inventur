@@ -107,8 +107,18 @@ input::placeholder{color:var(--td)}
 .tbl tbody tr:last-child td{border-bottom:none}
 .tbl tbody tr:hover td{background:var(--a-bg)}
 .mn{font-family:var(--mono);font-size:13px;color:var(--a);font-weight:700}
-.del{background:none;border:none;color:var(--td);cursor:pointer;padding:4px 8px;border-radius:4px;font-size:13px}
-.del:hover{color:var(--red);background:var(--rbg)}
+.del{background:none;border:none;color:var(--red);cursor:pointer;padding:4px 8px;border-radius:4px;font-size:16px;opacity:0.7}
+.del:hover{opacity:1;background:var(--rbg)}
+.trash{font-size:16px}
+
+/* DELETE MODAL */
+.del-modal{background:var(--s1);border-radius:12px;padding:18px;width:min(340px,94vw);box-shadow:var(--sh2)}
+.del-modal-title{font-size:13px;font-weight:700;color:var(--red);margin-bottom:4px}
+.del-modal-sub{font-size:12px;color:var(--tm);margin-bottom:14px}
+.del-item-row{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:var(--s2);border-radius:7px;margin-bottom:6px}
+.del-item-qty{font-family:var(--mono);font-weight:700;font-size:15px}
+.del-item-btn{background:var(--rbg);border:1px solid #fca5a5;color:var(--red);cursor:pointer;padding:5px 12px;border-radius:6px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:5px}
+.del-item-btn:hover{background:#fee2e2}
 
 /* SUMMARY */
 .stbl{width:100%;border-collapse:collapse;font-size:12px}
@@ -169,7 +179,7 @@ input::placeholder{color:var(--td)}
   <button class="btn-home" onclick="gotoHome()" title="Startseite">🏠 <span>Start</span></button>
   <div class="hdr-sep"></div>
   <div class="hdr-crumbs" id="hdr-crumbs"></div>
-  <span style="font-size:10px;font-family:monospace;color:#aaa;flex-shrink:0;margin-right:4px">v36</span>
+  <span style="font-size:10px;font-family:monospace;color:#aaa;flex-shrink:0;margin-right:4px">v37</span>
   <button class="btn-export-hdr" onclick="exportCSV()">⬇ CSV</button>
 </div>
 
@@ -278,7 +288,7 @@ input::placeholder{color:var(--td)}
     <button class="btn-csv" onclick="exportCSV()">⬇ CSV-Datei herunterladen</button>
     <div style="font-size:12px;color:#15803d;text-align:center;margin-top:8px">Alle Felder in einer Zeile · Semikolon · UTF-8 für Excel</div>
   </div>
-  <button class="btn btn-d btn-sm" onclick="clearAll()" style="margin-bottom:14px">⚠ Alle Daten löschen</button>
+  <button class="btn btn-d btn-sm" onclick="clearAll()" style="margin-bottom:14px">🗑 Alle Daten löschen</button>
   <div class="lbl">Alle Positionen (summiert über alle Standorte)</div>
   <div class="card">
     <div class="tbl-wrap">
@@ -314,6 +324,19 @@ input::placeholder{color:var(--td)}
     </div>
     <div class="scan-st" id="scan-msg">Wird gestartet …</div>
     <div class="scan-hint" id="scan-hint"></div>
+  </div>
+</div>
+
+<!-- DELETE MODAL -->
+<div class="ov" id="del-ov">
+  <div class="del-modal">
+    <div class="modal-hdr" style="margin-bottom:4px">
+      <span class="del-modal-title" id="del-title">Eintrag löschen</span>
+      <button class="modal-x" onclick="closeDelModal()">✕</button>
+    </div>
+    <div class="del-modal-sub" id="del-sub"></div>
+    <div id="del-items-list"></div>
+    <button class="btn btn-g btn-sm" style="width:100%;margin-top:8px;justify-content:center" onclick="closeDelModal()">Abbrechen</button>
   </div>
 </div>
 
@@ -588,7 +611,7 @@ function renderPSAs(){
       </div>
       <div class="row-act">
         <button class="btn btn-g btn-sm" onclick="renPSA('${p.id}')">✎ Umbenennen</button>
-        <button class="btn btn-d btn-sm" onclick="delPSA('${p.id}')">✕ Löschen</button>
+        <button class="btn btn-d btn-sm" onclick="delPSA('${p.id}')">🗑 Löschen</button>
       </div>
     </div>`;
   }).join('');
@@ -627,7 +650,7 @@ function renderAreas(){
       </div>
       <div class="row-act">
         <button class="btn btn-g btn-sm" onclick="renArea('${a.id}')">✎ Umbenennen</button>
-        <button class="btn btn-d btn-sm" onclick="delArea('${a.id}')">✕ Löschen</button>
+        <button class="btn btn-d btn-sm" onclick="delArea('${a.id}')">🗑 Löschen</button>
       </div>
     </div>`;
   }).join('');
@@ -693,7 +716,7 @@ function renderItems(){
       <td><span class="mn">${esc(it.matnr)}</span></td>
       <td style="color:var(--tm)">${esc(it.desc||'—')}</td>
       <td style="text-align:right;font-family:var(--mono);font-weight:700">${fmtN(it.qty)}</td>
-      <td><button class="del" onclick="delItem('${it.id}')">✕</button></td>
+      <td><button class="del" onclick="delItem('${it.id}')" title="Löschen">🗑</button></td>
     </tr>`).join('');
 }
 
@@ -751,9 +774,8 @@ function renderSum(){
       // Finde den original item für diese Location um ihn löschen zu können
       const area=S.areas.find(a=>a.name===parts[1]&&a.psaId===(S.psas.find(p=>p.name===parts[0])?.id));
       const matchItems=S.items.filter(i=>i.matnr===r.matnr&&(area?i.areaId===area.id:false));
-      const delBtns=matchItems.map(it=>
-        `<button onclick="delItemFromSum('${it.id}')" style="background:var(--rbg);border:1px solid #fca5a5;color:var(--red);cursor:pointer;padding:3px 9px;font-size:12px;border-radius:5px;font-weight:700;white-space:nowrap;margin-left:4px" title="Löschen">✕ ${fmtN(it.qty)}</button>`
-      ).join('');
+      const delKey=`${r.matnr}__${parts[1]||''}__${parts[0]||''}`;
+      const delBtn=matchItems.length?`<button onclick="openDelModal('${esc(delKey)}')" style="background:var(--rbg);border:1px solid #fca5a5;color:var(--red);cursor:pointer;padding:5px 10px;border-radius:6px;font-size:16px" title="Einträge löschen">🗑</button>`:'';
       html+=`<tr style="background:#f8f9fb;border-left:3px solid var(--br2)">
         <td style="color:var(--tm);font-size:12px;padding-left:16px">${esc(parts[0]||'')}</td>
         <td><span class="mn">${esc(r.matnr)}</span></td>
@@ -761,7 +783,7 @@ function renderSum(){
         <td style="font-size:11px;color:var(--tm)">${esc(parts[1]||'')}</td>
         <td style="text-align:right;font-family:var(--mono);color:var(--tm)">${fmtN(loc.qty)}</td>
         <td></td><td></td>
-        <td style="text-align:right">${delBtns}</td>
+        <td style="text-align:right">${delBtn}</td>
       </tr>`;
     }
 
@@ -782,8 +804,46 @@ function renderSum(){
   }
   tbody.innerHTML=html;
 }
+function openDelModal(key){
+  // key = "matnr__bereich__psa"
+  const parts=key.split('__');
+  const matnr=parts[0], bereich=parts[1], psaName=parts[2];
+  // Find all items matching this combination
+  const area=S.areas.find(a=>{
+    const psa=S.psas.find(p=>p.id===a.psaId);
+    return a.name===bereich && psa && psa.name===psaName;
+  });
+  const matchItems=area?S.items.filter(i=>i.matnr===matnr&&i.areaId===area.id):[];
+  if(!matchItems.length){toast('Keine Einträge gefunden');return;}
+
+  document.getElementById('del-title').textContent='🗑 Eintrag löschen';
+  document.getElementById('del-sub').textContent=`${psaName} / ${bereich} · Materialnr. ${matnr} · ${matchItems.length} Eintrag${matchItems.length!==1?'e':''}`;
+  document.getElementById('del-items-list').innerHTML=matchItems.map(it=>`
+    <div class="del-item-row">
+      <span class="del-item-qty">${fmtN(it.qty)}</span>
+      <button class="del-item-btn" onclick="confirmDelItem('${it.id}')">🗑 Löschen</button>
+    </div>`).join('');
+  document.getElementById('del-ov').classList.add('on');
+}
+
+function closeDelModal(){
+  document.getElementById('del-ov').classList.remove('on');
+}
+
+function confirmDelItem(id){
+  S.items=S.items.filter(i=>i.id!==id);
+  save();
+  // Refresh modal list or close if empty
+  const remaining=document.getElementById('del-items-list').querySelectorAll('.del-item-row');
+  if(remaining.length<=1){closeDelModal();renderSum();toast('Eintrag gelöscht');return;}
+  // Remove just this row
+  document.getElementById('del-items-list').querySelectorAll('.del-item-btn').forEach(btn=>{
+    if(btn.getAttribute('onclick').includes(id))btn.closest('.del-item-row').remove();
+  });
+  renderSum();toast('Eintrag gelöscht');
+}
+
 function delItemFromSum(id){
-  if(!confirm('Diesen Eintrag löschen?'))return;
   S.items=S.items.filter(i=>i.id!==id);
   save();renderSum();toast('Eintrag gelöscht');
 }
