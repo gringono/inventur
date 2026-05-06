@@ -169,7 +169,7 @@ input::placeholder{color:var(--td)}
   <button class="btn-home" onclick="gotoHome()" title="Startseite">🏠 <span>Start</span></button>
   <div class="hdr-sep"></div>
   <div class="hdr-crumbs" id="hdr-crumbs"></div>
-  <span style="font-size:10px;font-family:monospace;color:#aaa;flex-shrink:0;margin-right:4px">v34</span>
+  <span style="font-size:10px;font-family:monospace;color:#aaa;flex-shrink:0;margin-right:4px">v36</span>
   <button class="btn-export-hdr" onclick="exportCSV()">⬇ CSV</button>
 </div>
 
@@ -288,6 +288,7 @@ input::placeholder{color:var(--td)}
           <th style="text-align:right">Gezählt</th>
           <th style="text-align:right">Systembestand</th>
           <th style="text-align:right">Differenz</th>
+          <th></th>
         </tr></thead>
         <tbody id="sum-body"></tbody>
       </table>
@@ -742,7 +743,7 @@ function renderSum(){
     const ds=diff===null?'—':(diff>0?'+':'')+fmtN(diff);
 
     // Gruppe: leichter blauer Hintergrund für alle Zeilen dieser Gruppe
-    html+=`<tr><td colspan="7" style="padding:0;height:6px;background:var(--bg)"></td></tr>`;
+    html+=`<tr><td colspan="8" style="padding:0;height:6px;background:var(--bg)"></td></tr>`;
 
     // Detail rows
     for(const loc of r.locs){
@@ -751,7 +752,7 @@ function renderSum(){
       const area=S.areas.find(a=>a.name===parts[1]&&a.psaId===(S.psas.find(p=>p.name===parts[0])?.id));
       const matchItems=S.items.filter(i=>i.matnr===r.matnr&&(area?i.areaId===area.id:false));
       const delBtns=matchItems.map(it=>
-        `<button onclick="delItemFromSum('${it.id}')" style="background:none;border:none;color:var(--td);cursor:pointer;padding:2px 5px;font-size:12px;border-radius:3px" title="Löschen">✕ ${fmtN(it.qty)}</button>`
+        `<button onclick="delItemFromSum('${it.id}')" style="background:var(--rbg);border:1px solid #fca5a5;color:var(--red);cursor:pointer;padding:3px 9px;font-size:12px;border-radius:5px;font-weight:700;white-space:nowrap;margin-left:4px" title="Löschen">✕ ${fmtN(it.qty)}</button>`
       ).join('');
       html+=`<tr style="background:#f8f9fb;border-left:3px solid var(--br2)">
         <td style="color:var(--tm);font-size:12px;padding-left:16px">${esc(parts[0]||'')}</td>
@@ -759,7 +760,8 @@ function renderSum(){
         <td style="color:var(--tm);font-size:12px">${esc(r.desc||'—')}</td>
         <td style="font-size:11px;color:var(--tm)">${esc(parts[1]||'')}</td>
         <td style="text-align:right;font-family:var(--mono);color:var(--tm)">${fmtN(loc.qty)}</td>
-        <td colspan="2" style="text-align:right">${delBtns}</td>
+        <td></td><td></td>
+        <td style="text-align:right">${delBtns}</td>
       </tr>`;
     }
 
@@ -774,8 +776,9 @@ function renderSum(){
         value="${has?sys:''}" placeholder="—"
         data-key="${esc(sysKey)}" onchange="setSys(this)"></td>
       <td class="diff ${dc}" id="diff-${esc(sysKey)}" style="font-size:15px">${ds}</td>
+      <td></td>
     </tr>
-    <tr><td colspan="7" style="padding:0;height:8px;background:var(--bg)"></td></tr>`;
+    <tr><td colspan="8" style="padding:0;height:8px;background:var(--bg)"></td></tr>`;
   }
   tbody.innerHTML=html;
 }
